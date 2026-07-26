@@ -24,10 +24,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Map
@@ -45,6 +48,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -65,10 +69,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.foscal.core.model.Attendee
 import app.foscal.core.model.Frequency
 import app.foscal.core.model.ReminderDuration
 import app.foscal.core.ui.theme.Motion
@@ -365,6 +372,25 @@ private fun EditorForm(
             }
         }
 
+        // Guests — hidden entirely on an event that is neither ours to invite to nor has anyone
+        // on it, since there would be nothing to show and nothing to do.
+        if (state.canEditGuests || state.attendees.isNotEmpty()) {
+            Section {
+                GuestsField(
+                    attendees = state.attendees,
+                    draft = state.guestDraft,
+                    editable = state.canEditGuests,
+                    canAdd = state.canAddGuest,
+                    onDraftChange = viewModel::updateGuestDraft,
+                    onAdd = viewModel::addGuest,
+                    onRemove = viewModel::removeGuest,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                )
+            }
+        }
+
         // Notes
         Section {
             OutlinedTextField(
@@ -626,6 +652,83 @@ private fun ReminderRow(
                 if (minutes !in selected) onToggle(minutes)
             },
         )
+    }
+}
+
+/**
+ * The guest list: one removable chip per attendee plus a field to add another.
+ *
+ * Foscal sends no invitations of its own — it writes the guests to the provider and the calendar's
+ * sync adapter delivers them. The organizer's chip has no remove affordance: it names the event's
+ * owner rather than someone who was invited.
+ *
+ * When [editable] is false the same guests are shown without the remove icons or the add field:
+ * the event is one somebody else organized, so its guest list is theirs to change, but hiding it
+ * outright would drop information the user can plainly see on the detail screen.
+ */
+@Composable
+private fun GuestsField(
+    attendees: List<Attendee>,
+    draft: String,
+    editable: Boolean,
+    canAdd: Boolean,
+    onDraftChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    onRemove: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Guests", style = MaterialTheme.typography.bodyLarge)
+        if (attendees.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                attendees.forEach { attendee ->
+                    val removable = editable && !attendee.isOrganizer
+                    InputChip(
+                        selected = false,
+                        enabled = removable,
+                        onClick = { if (removable) onRemove(attendee.email) },
+                        label = { Text(attendee.label) },
+                        trailingIcon = if (removable) {
+                            {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = "Remove ${attendee.label}",
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                    )
+                }
+            }
+        }
+        if (editable) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = onDraftChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Add guest") },
+                placeholder = { Text("name@example.com") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { onAdd() }),
+                trailingIcon = {
+                    IconButton(onClick = onAdd, enabled = canAdd) {
+                        Icon(Icons.Outlined.Add, contentDescription = "Add guest")
+                    }
+                },
+            )
+        } else {
+            Text(
+                "Only the organizer can change who is invited.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

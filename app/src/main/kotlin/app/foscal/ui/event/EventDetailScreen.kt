@@ -1,5 +1,7 @@
 package app.foscal.ui.event
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -22,14 +24,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -39,6 +50,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,11 +64,16 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.foscal.core.model.Attendee
+import app.foscal.core.model.AttendeeStatus
 import app.foscal.core.model.Event
+import app.foscal.core.model.MeetingLinks
 import app.foscal.core.model.ReminderDuration
 import app.foscal.core.ui.theme.BricolageFamily
 import app.foscal.core.ui.theme.Motion
@@ -126,6 +143,7 @@ fun EventDetailScreen(
                                 event = current,
                                 calendarName = state.calendar?.displayName ?: "Calendar",
                                 reminderMinutes = state.reminderMinutes,
+                                attendees = state.attendees,
                                 mapsEnabled = state.mapsEnabled,
                                 onOpenLocationMap = onOpenLocationMap,
                                 onEdit = { onEdit(eventId, current.start.toEpochMilli()) },
@@ -167,11 +185,18 @@ private fun DetailContent(
     event: Event,
     calendarName: String,
     reminderMinutes: List<Int>,
+    attendees: List<Attendee>,
     mapsEnabled: Boolean,
     onOpenLocationMap: (location: String) -> Unit,
     onEdit: () -> Unit,
 ) {
     val accent = Color(event.color)
+    val context = LocalContext.current
+    // The link is looked for in the location first: an invite whose location *is* the call means it
+    // literally, while a description often quotes a dial-in or recording link further down too.
+    val meetingUrl = remember(event.location, event.description) {
+        MeetingLinks.find(event.location, event.description)
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -183,21 +208,38 @@ private fun DetailContent(
         Column(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
         ) {
+            meetingUrl?.let { url ->
+                DetailRow(
+                    icon = Icons.Outlined.Videocam,
+                    text = MeetingLinks.providerName(url)?.let { "Join $it" } ?: "Join video call",
+                    onClick = { openLink(context, url) },
+                )
+            }
             event.rrule?.takeIf { it.isNotBlank() }?.let {
                 DetailRow(Icons.Outlined.Repeat, describeRecurrence(it))
             }
-            event.location?.takeIf { it.isNotBlank() }?.let { location ->
-                val context = LocalContext.current
-                DetailRow(
-                    icon = Icons.Outlined.LocationOn,
-                    text = location,
-                    // With the opt-in map on, show the place on an in-app OpenStreetMap; otherwise
-                    // hand the text to the device's maps app via a geo: intent so we stay offline.
-                    onClick = {
-                        if (mapsEnabled) onOpenLocationMap(location) else openInMaps(context, location)
-                    },
-                )
-            }
+            // A location that is nothing but the call link is already the Join row above, and
+            // handing a URL to a `geo:` intent searches a map for it — so it is suppressed
+            // entirely in that case. One that merely *contains* a link ("Room B — https://…")
+            // still names a real place and keeps its row.
+            event.location
+                ?.takeIf { it.isNotBlank() && it.trim() != meetingUrl }
+                ?.let { location ->
+                    DetailRow(
+                        icon = Icons.Outlined.LocationOn,
+                        text = location,
+                        // With the opt-in map on, show the place on an in-app OpenStreetMap;
+                        // otherwise hand the text to the device's maps app via a geo: intent so
+                        // we stay offline.
+                        onClick = {
+                            if (mapsEnabled) {
+                                onOpenLocationMap(location)
+                            } else {
+                                openInMaps(context, location)
+                            }
+                        },
+                    )
+                }
             if (reminderMinutes.isNotEmpty()) {
                 DetailRow(
                     icon = Icons.Outlined.Notifications,
@@ -226,6 +268,132 @@ private fun DetailContent(
             Spacer(Modifier.size(10.dp))
             Text("Edit event", fontWeight = FontWeight.SemiBold)
         }
+        if (attendees.isNotEmpty()) {
+            GuestsCard(attendees = attendees, onEmail = { openMail(context, it) })
+        }
+    }
+}
+
+/**
+ * The guest list, organizer first, with each person's answer.
+ *
+ * Tapping a row opens a mail composer — Foscal has no way to send or answer an invitation itself
+ * (that is the sync adapter's and the server's job), so passing the address to whatever mail app the
+ * user already has is the honest affordance rather than a Yes/No pair that would go nowhere.
+ */
+@Composable
+private fun GuestsCard(attendees: List<Attendee>, onEmail: (String) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                if (attendees.size == 1) "1 guest" else "${attendees.size} guests",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            attendees.forEach { attendee ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onEmail(attendee.email) }
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            attendee.initial(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            attendee.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            attendee.subtitle(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    val statusIcon = when (attendee.status) {
+                        AttendeeStatus.ACCEPTED -> Icons.Outlined.CheckCircle
+                        AttendeeStatus.DECLINED -> Icons.Outlined.Cancel
+                        AttendeeStatus.TENTATIVE -> Icons.AutoMirrored.Outlined.HelpOutline
+                        AttendeeStatus.INVITED -> Icons.Outlined.Schedule
+                    }
+                    Icon(
+                        statusIcon,
+                        contentDescription = attendee.statusLabel(),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** First letter of the display name, or of the address when there is none. */
+private fun Attendee.initial(): String =
+    label.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
+
+/** The answer, plus the address when the name is what's already on the row above. */
+private fun Attendee.subtitle(): String {
+    val role = if (isOrganizer) "Organizer • " else ""
+    val optionalMark = if (optional && !isOrganizer) " (optional)" else ""
+    return if (label == email) {
+        "$role${statusLabel()}$optionalMark"
+    } else {
+        "$role$email • ${statusLabel()}$optionalMark"
+    }
+}
+
+private fun Attendee.statusLabel(): String = when (status) {
+    AttendeeStatus.ACCEPTED -> "Going"
+    AttendeeStatus.DECLINED -> "Not going"
+    AttendeeStatus.TENTATIVE -> "Maybe"
+    AttendeeStatus.INVITED -> "Awaiting reply"
+}
+
+/**
+ * Hands [url] to whatever the user browses with.
+ *
+ * `resolveActivity` is deliberately not consulted first — package visibility on API 30+ hides
+ * browsers this app has no `<queries>` entry for, so the check reports "nothing can open this" for
+ * links that in fact open fine. Catching the failure covers the genuinely empty case.
+ */
+private fun openLink(context: Context, url: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+    }
+}
+
+private fun openMail(context: Context, email: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_SENDTO, "mailto:$email".toUri()))
     }
 }
 
