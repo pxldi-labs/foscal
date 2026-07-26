@@ -75,7 +75,8 @@ Beta. Working: Month / Week / Agenda / Settings tabs (bottom nav — Settings is
 tab in `HomeScreen`'s `AnimatedContent`, not a separate nav destination; the
 selected tab is `rememberSaveable` so returning from detail/editor preserves the
 current tab), event create/edit/delete, recurring events
-(this-vs-all-events, exceptions), reminders/notifications, real calendar colors,
+(this-vs-all-events, exceptions), reminders/notifications, guests/attendees with a
+join-video-call action, real calendar colors,
 offline local calendars, `.ics` import/export via the system document picker,
 permission-first onboarding. Week view is the shared
 hourly `TimelineLayout` with long-press drag-to-create and long-press
@@ -229,6 +230,36 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   any caller that passes a single value (or `minOrNull()`) silently destroys the other
   alarms, including ones DAVx⁵ synced down. The editor renders a chip per preset plus one
   per already-present value so nothing it can't display gets dropped on save.
+- **`EventInput.attendees` is nullable and null means "leave them alone".** Guests are
+  all-or-nothing exactly like reminders — the provider has no partial update for `Attendees`, so
+  `writeAttendees` clears and reinserts. Unlike reminders, most callers have no guest list at all
+  (quick add, a week-grid drag-to-move, an `.ics` file with no ATTENDEE lines), and an empty list
+  from those would wipe every guest DAVx⁵ synced down. Only a caller that actually *read* the
+  guests may pass a list; the editor does, which is why it can write an empty one when the user
+  removes the last guest. A recurrence exception inherits the master's guests through the same
+  null.
+- **The organizer lives in the `Attendees` table too.** The provider tells it from a guest only by
+  `ATTENDEE_RELATIONSHIP`; RFC 5545 gives it its own ORGANIZER property and allows exactly one, so
+  `Event.toIcsEvent` splits it out. Most exporters *also* list the organizer as an ATTENDEE, so the
+  reader drops the duplicate row rather than showing the same person twice. The editor will not let
+  the organizer be removed: dropping that row un-invites nobody, it only loses which address the
+  invitation came from.
+- **Foscal sends no invitations.** It writes guests to the provider and the calendar's sync adapter
+  delivers them. There is deliberately no Yes/No affordance on the detail screen — tapping a guest
+  opens a `mailto:` intent, which is the only thing the app can honestly do.
+- **The editor only offers the guest field for events the user organized**
+  (`EditorUiState.canEditGuests`). Rewriting the `ATTENDEE` rows of somebody else's event is not an
+  edit but a scheduling message, and CalDAV servers vary in what they do with one — up to mailing
+  every guest a spurious update. Editable means: a new event, a local calendar, an event with no
+  ORGANIZER at all (what a plain CalDAV event from a non-scheduling client looks like — there is
+  nobody whose event it is instead), or an organizer matching the calendar's `OWNER_ACCOUNT`.
+  Otherwise the guests still render, read-only, and **the save passes `attendees = null`** — writing
+  the list back even unchanged re-sends it to the server. Both mutators re-check the gate, so a
+  disabled control is not the only thing enforcing it.
+- **A location that is only a call link gets no Location card.** `MeetingLinks.find` scans location
+  then description; when the whole location *is* the matched URL, the detail screen suppresses the
+  location card, because it would repeat the Join card and its `geo:` intent would search a map for
+  a URL. A location that merely contains a link still names a real place and keeps its card.
 - **Never re-anchor an event's time zone.** `EventInput.timezone` must carry the edited
   event's original `EVENT_TIMEZONE`; the editor keeps it in
   `EditorUiState.originalTimezone`. Rewriting it to the device zone preserves the chosen

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.foscal.core.data.CalendarRepository
 import app.foscal.core.data.Preferences
+import app.foscal.core.model.Attendee
 import app.foscal.core.model.Calendar
 import app.foscal.core.model.Event
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +19,8 @@ data class EventDetailUiState(
     val loading: Boolean = true,
     val event: Event? = null,
     val calendar: Calendar? = null,
+    /** Everyone on the event, organizer first. Empty when it has no guest list. */
+    val attendees: List<Attendee> = emptyList(),
     /** Whether the opt-in map is on, deciding in-app OSM viewer vs external geo: intent. */
     val mapsEnabled: Boolean = false,
 )
@@ -38,14 +41,23 @@ class EventDetailViewModel @Inject constructor(
     }
 
     fun load(eventId: Long, instanceStartMillis: Long = 0L, showLoading: Boolean = true) {
-        if (showLoading) _state.update { it.copy(loading = true, event = null, calendar = null) }
+        if (showLoading) {
+            _state.update {
+                it.copy(loading = true, event = null, calendar = null, attendees = emptyList())
+            }
+        }
         viewModelScope.launch {
             val calendars = repository.getCalendars()
             // Prefer the exact occurrence the user tapped; the repository falls back to the master
             // row when there isn't one (e.g. opened from a notification, which carries only the id).
             val event = repository.getEventOccurrence(eventId, instanceStartMillis)
             val cal = calendars.firstOrNull { it.id == event?.calendarId }
-            _state.update { it.copy(loading = false, event = event, calendar = cal) }
+            // Guests hang off the event row, so a moved occurrence carries its own list while an
+            // unmodified one shares the master's — either way the id the lookup returned is right.
+            val attendees = event?.let { repository.getAttendees(it.id) }.orEmpty()
+            _state.update {
+                it.copy(loading = false, event = event, calendar = cal, attendees = attendees)
+            }
         }
     }
 }
