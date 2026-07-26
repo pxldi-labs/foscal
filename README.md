@@ -98,7 +98,7 @@ CalDAV-compatible server (Nextcloud, ownCloud, Radicale, Baïkal, …) via
 - Single-activity, multi-module Gradle project
 - Hilt for dependency injection and DataStore for preferences
 - Reads/writes `android.provider.CalendarContract`
-- minSdk 26, targetSdk 35
+- minSdk 26, targetSdk 36, compileSdk 37
 
 ## Project layout
 
@@ -112,7 +112,7 @@ core/
 
 ## Build
 
-Requires JDK 17 and the Android SDK (platform 35, build-tools 35.0.0).
+Requires JDK 17 and the Android SDK (platform 37.1, build-tools 37.0.0).
 
 ```bash
 ./gradlew :app:assembleDebug

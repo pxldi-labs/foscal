@@ -122,7 +122,7 @@ interface CalendarRepository {
 
 @Singleton
 class CalendarContractRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val permission: CalendarPermissionState,
 ) : CalendarRepository {
 

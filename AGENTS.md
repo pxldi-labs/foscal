@@ -29,6 +29,25 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME
   so formatting follows the official Kotlin conventions; no ktlint/detekt is
   wired up yet.
 
+## Build configuration
+
+AGP 9 with **built-in Kotlin support**. Consequences worth knowing before editing a
+`build.gradle.kts`:
+
+- **Do not apply `org.jetbrains.kotlin.android`** in `:app`, `:core:core-ui`, or
+  `:core:core-data`. AGP supplies Kotlin itself and the plugin is incompatible with the
+  new DSL; applying it fails the build outright. `:core:core-model` is a plain JVM module
+  and still uses `kotlin-jvm`. The Compose compiler plugin *is* still applied separately.
+- **`jvmTarget` lives in `android { kotlin { compilerOptions { … } } }`.** The old
+  top-level `kotlinOptions { }` block is gone.
+- **`compileSdk` is 37, `targetSdk` is 36.** They are deliberately different: the newest
+  androidx libraries require compiling against 37, while 36 is what the app has actually
+  been tested against for runtime behavior. Bumping `targetSdk` opts into Android 17
+  behavior changes and must be a deliberate, separately verified change.
+- **`lint` is part of the definition of done and currently passes with zero errors.**
+  Newer AGP lint checks are strict; in particular `NonObservableLocale` will reject any
+  `Locale.getDefault()` read inside a composable (see the locale note below).
+
 Always run `./gradlew assembleDebug` and `./gradlew lint` after non-trivial
 changes. Do not commit code that does not build or that fails lint.
 
@@ -83,6 +102,13 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   Never hardcode the accent — read `colorScheme.primary`.
 - **Weekend labels** — use `weekendLabelColor()` from the theme (theme-aware gold),
   never a hardcoded value.
+- **Locale** — in composables read `currentLocale()` (`ui/util/Locales.kt`) or
+  `rememberDateFormatter(pattern)`, never `Locale.getDefault()`: the latter is a
+  process-global read, so the UI keeps stale month/weekday names after a language change,
+  and AGP lint fails the build on it (`NonObservableLocale`). Non-composable label helpers
+  take a `Locale` parameter threaded from the call site. Note that the `Dates` object's
+  top-level `DateTimeFormatter` vals are still locale-frozen at class-init — do not add
+  more of those.
 - **Light/dark branching** — read `LocalIsDarkTheme.current` (provided by `FoscalTheme`),
   never `isSystemInDarkTheme()`. The latter reports only the OS setting, so it disagrees
   with the rest of the UI whenever the user has forced Light or Dark in Settings. The only
