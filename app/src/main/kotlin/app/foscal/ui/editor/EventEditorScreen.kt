@@ -287,8 +287,8 @@ private fun EditorForm(
         // Reminder
         Section {
             ReminderRow(
-                selected = state.reminderMinutesBefore,
-                onSelect = viewModel::updateReminder,
+                selected = state.reminderMinutes,
+                onToggle = viewModel::toggleReminder,
                 modifier = rowPadding.fillMaxWidth(),
             )
         }
@@ -572,37 +572,40 @@ private fun ChipRow(
     }
 }
 
+private val ReminderPresets = listOf(0, 5, 15, 30, 60, 1440)
+
+internal fun reminderLabel(minutes: Int): String = when {
+    minutes == 0 -> "At start"
+    minutes % 1440 == 0 -> "${minutes / 1440} day".pluralize(minutes / 1440)
+    minutes % 60 == 0 -> "${minutes / 60} hour".pluralize(minutes / 60)
+    else -> "$minutes min"
+}
+
+private fun String.pluralize(count: Int): String = if (count == 1) this else "${this}s"
+
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ReminderRow(
-    selected: Int?,
-    onSelect: (Int?) -> Unit,
+    selected: List<Int>,
+    onToggle: (Int?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val options = listOf(
-        null to "None",
-        0 to "At start",
-        5 to "5 min",
-        15 to "15 min",
-        30 to "30 min",
-        60 to "1 hour",
-        1440 to "1 day",
-    )
+    // Show the presets plus any value the event already carries (a 10-minute alarm set in another
+    // app must stay togglable here, or saving would silently drop it).
+    val options = remember(selected) { (ReminderPresets + selected).distinct().sorted() }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Reminder", style = MaterialTheme.typography.bodyLarge)
+        Text("Reminders", style = MaterialTheme.typography.bodyLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            options.forEach { (minutes, label) ->
-                AssistChip(
-                    onClick = { onSelect(minutes) },
-                    label = { Text(label) },
-                    colors = if (selected == minutes) {
-                        AssistChipDefaults.assistChipColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    } else {
-                        AssistChipDefaults.assistChipColors()
-                    },
+            FilterChip(
+                selected = selected.isEmpty(),
+                onClick = { onToggle(null) },
+                label = { Text("None") },
+            )
+            options.forEach { minutes ->
+                FilterChip(
+                    selected = minutes in selected,
+                    onClick = { onToggle(minutes) },
+                    label = { Text(reminderLabel(minutes)) },
                 )
             }
         }

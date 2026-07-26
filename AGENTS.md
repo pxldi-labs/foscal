@@ -83,6 +83,11 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   Never hardcode the accent — read `colorScheme.primary`.
 - **Weekend labels** — use `weekendLabelColor()` from the theme (theme-aware gold),
   never a hardcoded value.
+- **Light/dark branching** — read `LocalIsDarkTheme.current` (provided by `FoscalTheme`),
+  never `isSystemInDarkTheme()`. The latter reports only the OS setting, so it disagrees
+  with the rest of the UI whenever the user has forced Light or Dark in Settings. The only
+  legitimate callers of `isSystemInDarkTheme()` are `MainActivity`, where `ThemeMode.SYSTEM`
+  is resolved into the `darkTheme` argument, and that parameter's own default.
 - **Icon** — one unified mark for launcher (`res/drawable/ic_launcher_foreground.xml`)
   and the in-app onboarding hero (`OnboardingScreen.FoscalMark`). Keep them
   in sync if you change one.
@@ -134,6 +139,18 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   Vertical swipes on the month grid are aliases for month navigation (up =
   next month, down = previous month) and use dominant-axis drag detection so
   diagonal gestures do not trigger both horizontal and vertical navigation.
+- **Reminders are all-or-nothing.** The provider has no partial-update path for
+  `Reminders`, so `updateEvent` deletes every row for the event and reinserts from
+  `EventInput.reminderMinutes`. That list must therefore always be the *complete* set —
+  any caller that passes a single value (or `minOrNull()`) silently destroys the other
+  alarms, including ones DAVx⁵ synced down. The editor renders a chip per preset plus one
+  per already-present value so nothing it can't display gets dropped on save.
+- **Never re-anchor an event's time zone.** `EventInput.timezone` must carry the edited
+  event's original `EVENT_TIMEZONE`; the editor keeps it in
+  `EditorUiState.originalTimezone`. Rewriting it to the device zone preserves the chosen
+  instant locally but re-anchors recurrence expansion and shifts the event for every other
+  client on the same CalDAV calendar. Only new events (and all-day events, which are UTC by
+  contract) may use the device zone. Unparseable stored zones fall back to it.
 - **Provider calls can throw `IllegalArgumentException`** for values it rejects;
   the repository's `safe*` helpers swallow both that and `SecurityException` so a
   bad write never crashes the app.
