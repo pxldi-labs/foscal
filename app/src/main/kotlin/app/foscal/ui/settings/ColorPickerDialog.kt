@@ -169,7 +169,7 @@ private fun Palette(selected: Int, onPick: (Int) -> Unit) {
                 row.forEach { swatch ->
                     Swatch(
                         argb = swatch,
-                        selected = swatch == selected,
+                        selected = swatch matches selected,
                         onClick = { onPick(swatch) },
                     )
                 }
@@ -177,6 +177,19 @@ private fun Palette(selected: Int, onPick: (Int) -> Unit) {
         }
     }
 }
+
+/**
+ * Whether two colours are the same to the eye.
+ *
+ * Tapping a swatch stores it as HSV, and HSV is float maths: converting back can land a channel one
+ * step off where it started. An exact `==` would then fail to tick the very swatch just tapped, so
+ * allow each channel to be out by one.
+ */
+private infix fun Int.matches(other: Int): Boolean =
+    (0..16 step 8).all { shift ->
+        val delta = ((this shr shift) and 0xFF) - ((other shr shift) and 0xFF)
+        delta in -1..1
+    }
 
 @Composable
 private fun Swatch(argb: Int, selected: Boolean, onClick: () -> Unit) {
