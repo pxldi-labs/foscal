@@ -35,6 +35,14 @@ Two consequences of how the SDK is mounted:
 - **Format / verify Kotlin style:** the project uses `kotlin.code.style=official`,
   so formatting follows the official Kotlin conventions; no ktlint/detekt is
   wired up yet.
+- **What CI actually runs on a pull request:**
+  `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest :core:core-model:test`.
+  Run exactly that before pushing — it is one Gradle invocation on purpose, and it is the whole
+  gate. The release variant is *not* built on pull requests; it runs on `main`, on tags, and via
+  `workflow_dispatch`. The runner is a single memory-constrained machine shared with everything else
+  on it, so keep the PR job to one invocation, leave `--max-workers=2` alone, and do not add steps
+  that build a second variant. `concurrency.cancel-in-progress` means a force-push supersedes the
+  older run rather than queueing behind it.
 
 ## Build configuration
 
@@ -272,6 +280,24 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   a null Int, so the stored sentinel is `-1`; the flow resolves an *absent* key to the built-in
   15-minute default itself. A caller writing `?: 15` therefore re-adds the exact alarm the user
   turned off in Settings. Use `listOfNotNull(...)` when building `EventInput.reminderMinutes`.
+- **A per-calendar reminder default has three states, and `perCalendar[id] ?: global` collapses two
+  of them.** An absent key means "follow the global default"; a key mapped to null means the user
+  chose "None" *for that calendar*, which must beat a non-null global. Always go through
+  `CalendarReminderDefaults.resolve`, which checks `containsKey` before the lookup.
+- **`ReminderHealthProbe.probe()` runs on `Dispatchers.IO`, and must keep doing so.** It reads like a
+  handful of getters, but it is a DataStore read from disk plus a dozen-odd binder round trips
+  (notification, alarm, power, activity and package managers). `viewModelScope` is the main
+  dispatcher, so calling it without the switch ANRs the settings screen on a slow device — which is
+  how this was found. `VendorSettings.autostartIntent` caches its result for the same reason: it
+  costs one `resolveActivity` per candidate ROM and the answer cannot change at runtime.
+- **Offer the battery-optimization *list*, never `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.**
+  The one-tap dialog needs the `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission, which store policy
+  treats as restricted and grants only to a narrow set of app categories.
+  `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` needs no permission at all.
+- **Anything resolved across a package boundary needs a `<queries>` entry.** From Android 11,
+  `getPackageInfo` throws `NameNotFoundException` and `resolveActivity` returns null for undeclared
+  packages — indistinguishable from the app genuinely not being installed. This covers DAVx⁵ and
+  every vendor autostart screen in `VendorSettings.CANDIDATES`.
 - **A recurrence exception starts life with the master's reminders.** The provider seeds the new
   exception row by copying the master's children, so `updateEventInstance` must clear reminders on
   the new id before writing the editor's set — otherwise editing one occurrence leaves it holding
