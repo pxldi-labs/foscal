@@ -238,7 +238,30 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   `reschedule` receives only the reminders that still exist, so deriving what to cancel from it
   strands alarms for deleted events, removed reminders, moved occurrences, and any offset outside
   a hardcoded preset list. `AlarmReminderScheduler` records the request codes it scheduled in
-  SharedPreferences and cancels exactly those next time.
+  SharedPreferences and cancels exactly those next time. The registry write is in a `finally`: it is
+  the only record of what is armed, so losing it strands every alarm set in that pass.
+- **An all-day reminder anchors to *local* midnight, never to the stored start.** The provider keeps
+  all-day events at UTC midnight, so subtracting the offset from `Instances.BEGIN` puts "15 minutes
+  before" at 01:45 local in UTC+2 and at 18:45 the *previous day* in UTC-5. Compute triggers with
+  `ReminderTrigger.triggerAtMillis(start, allDay, minutes, zone)` and keep `startMillis` raw — it is
+  the alarm key and the Instances lookup value, not a display value.
+- **The scheduling horizon is `ARM_AHEAD_DAYS + largest reminder offset`, not the larger of the two.**
+  A reminder fires at `eventStart - offset`, so arming 7 days ahead of *firing* requires querying
+  events up to 7 days + the offset out. `max(7d, 14d)` silently loses a 2-week reminder on an event
+  20 days away — the event never enters the window, so the alarm is never set. `ReminderTrigger.horizonEnd`
+  also rounds up to the next local midnight; truncating down puts the end before `now + days`.
+- **An unreadable provider must not look like an empty calendar.** `getUpcomingReminders` returns
+  **null** when the query fails and an empty list only when there genuinely are no reminders. An
+  empty list instructs `reschedule` to cancel everything, so flattening the two silently disarmed a
+  user's whole calendar on any transient failure. The worker returns `Result.retry()` on null.
+- **`ReminderSyncWorker` must re-arm the content trigger *last*.** The trigger is one-shot unique
+  work, so the re-arm replaces the name the running job itself holds — and WorkManager cancels a
+  running instance to make room. Re-arming first therefore cancelled the worker before it armed
+  anything: the trigger looped forever while no alarm was ever scheduled. `ensureScheduled` uses
+  `KEEP` for the same reason, so opening the app cannot kill an in-flight sync.
+- **Force-stopping the app cancels its alarms *and* its jobs, and nothing runs until it is
+  reopened.** This is OS behaviour, not a bug — but it means `adb shell am force-stop` invalidates
+  any reminder test. Use `am kill` plus HOME to simulate a backgrounded app instead.
 - **`ensureLocalCalendar` is find-or-create, deliberately.** The Calendar Provider outlives the
   app's own data, so a plain insert on every onboarding run adds a duplicate "My calendar" after
   each data clear or reinstall and strands the user's events in the first one.
