@@ -178,6 +178,12 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   with the rest of the UI whenever the user has forced Light or Dark in Settings. The only
   legitimate callers of `isSystemInDarkTheme()` are `MainActivity`, where `ThemeMode.SYSTEM`
   is resolved into the `darkTheme` argument, and that parameter's own default.
+- **Opening from other apps** — every intent the app answers is parsed in one place,
+  `IntentRoute.kt`, into an `IntentRoute` that `FoscalNavHost` acts on. `routeFor(RouteRequest)`
+  holds the rules over plain data so they can be unit-tested without an `Intent`; the
+  `routeFor(Intent)` overload is only the unpacking. Add a case there rather than reading
+  `intent.extras` at a call site, and add the matching `<intent-filter>` — a filter with nothing
+  behind it puts Foscal in "Open with" for something it then ignores.
 - **Icon** — one unified mark for launcher (`res/drawable/ic_launcher_foreground.xml`)
   and the in-app onboarding hero (`OnboardingScreen.FoscalMark`, which draws
   `ic_foscal_badge.xml`). Keep them in sync if you change one, and redraw
