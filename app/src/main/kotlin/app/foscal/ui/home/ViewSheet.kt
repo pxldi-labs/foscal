@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +64,7 @@ import app.foscal.core.ui.theme.Motion
 import app.foscal.ui.calendars.CalendarRow
 import app.foscal.ui.contrastColor
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -139,43 +141,57 @@ private fun DragSheet(
             val dismissPx = with(density) { DismissTravel.toPx() }
             val scope = rememberCoroutineScope()
 
-            // Distance the sheet is pushed below its fully-open position. Zero is fully open;
-            // its own height is entirely off the bottom of the screen.
-            val offset = remember { Animatable(0f) }
+            // How much of the sheet is pushed off the bottom, as a fraction of its own height:
+            // 0 is fully open, 1 is entirely gone. Held as a fraction rather than in pixels so a
+            // re-measure — which a scrolling column inside a height cap does routinely — moves the
+            // sheet proportionally instead of stranding it somewhere that no longer means
+            // anything. The earlier pixel version could be left sitting exactly one old height
+            // below the screen, off the bottom with no handle left to grab.
+            val hidden = remember { Animatable(1f) }
             var sheetPx by remember { mutableFloatStateOf(0f) }
-            var openedAt by remember { mutableFloatStateOf(0f) }
 
-            LaunchedEffect(sheetPx) {
-                if (sheetPx <= 0f || openedAt > 0f) return@LaunchedEffect
-                // A sheet shorter than the opening height has nothing to hold back and simply
-                // arrives whole; a taller one comes up to the halfway line.
-                openedAt = (sheetPx - screenPx * OpenFraction).coerceAtLeast(0f)
-                offset.snapTo(sheetPx)
-                offset.animateTo(openedAt, tween(Motion.DurationMedium))
+            // Where it comes to rest on opening: a sheet shorter than half the screen has nothing
+            // to hold back and arrives whole, a taller one stops at the halfway line.
+            val restingFraction =
+                if (sheetPx <= 0f) 1f
+                else ((sheetPx - screenPx * OpenFraction).coerceAtLeast(0f) / sheetPx)
+
+            // Keyed on nothing, and waiting for the first measurement rather than restarting on
+            // every one. Keyed on the height, a second measure cancelled the opening animation
+            // partway and the sheet never arrived.
+            LaunchedEffect(Unit) {
+                val measured = snapshotFlow { sheetPx }.first { it > 0f }
+                val resting = (measured - screenPx * OpenFraction).coerceAtLeast(0f) / measured
+                hidden.animateTo(resting, tween(Motion.DurationMedium))
             }
 
             val close: () -> Unit = {
                 scope.launch {
-                    offset.animateTo(sheetPx, tween(Motion.DurationShort))
+                    hidden.animateTo(1f, tween(Motion.DurationShort))
                     onDismiss()
                 }
             }
 
             /** Moves the sheet by [delta] px, returning how much of it was used. */
             fun drag(delta: Float): Float {
-                val used = (offset.value + delta).coerceIn(0f, sheetPx) - offset.value
+                if (sheetPx <= 0f) return 0f
+                val target = (hidden.value + delta / sheetPx).coerceIn(0f, 1f)
+                val used = (target - hidden.value) * sheetPx
                 // The new position is worked out again inside the coroutine rather than captured
                 // here. Animatable serialises its writes, so a fast drag can queue several of
                 // these, and a target computed up front would be stale by the time it ran —
                 // which loses movement exactly when the finger is going fastest.
                 if (used != 0f) {
-                    scope.launch { offset.snapTo((offset.value + used).coerceIn(0f, sheetPx)) }
+                    scope.launch {
+                        hidden.snapTo((hidden.value + used / sheetPx).coerceIn(0f, 1f))
+                    }
                 }
                 return used
             }
 
             val settle: () -> Unit = {
-                if (offset.value > openedAt + dismissPx) close() else Unit
+                val travelled = (hidden.value - restingFraction) * sheetPx
+                if (travelled > dismissPx) close() else Unit
             }
 
             Box(
@@ -222,7 +238,7 @@ private fun DragSheet(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .heightIn(max = maxHeight * MaxFraction)
-                    .offset { IntOffset(0, offset.value.roundToInt()) }
+                    .offset { IntOffset(0, (hidden.value * sheetPx).roundToInt()) }
                     .onSizeChanged { sheetPx = it.height.toFloat() }
                     .nestedScroll(nested),
             ) {
