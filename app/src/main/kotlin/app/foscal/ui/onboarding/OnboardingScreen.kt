@@ -3,6 +3,14 @@ package app.foscal.ui.onboarding
 import android.Manifest
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -63,14 +71,28 @@ import app.foscal.core.data.CalendarPermissionState
 import app.foscal.core.model.AccentColor
 import app.foscal.core.model.ThemeMode
 import app.foscal.core.ui.theme.BricolageFamily
+import app.foscal.core.ui.theme.Motion
 import app.foscal.ui.settings.AccentPicker
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import androidx.core.content.ContextCompat
 
-private enum class OnboardingStep { WELCOME, CALENDARS, NOTIFICATIONS }
+private enum class OnboardingStep { WELCOME, PREPARING, CALENDARS, NOTIFICATIONS }
+
+/**
+ * How long the setup screen holds before showing what it found.
+ *
+ * Granting the permission used to swap the screen out on the same frame the system dialog
+ * disappeared, which reads as a glitch rather than as progress — the dialog vanishes and a
+ * different screen is simply there. The app does have something to do at that moment (it can
+ * finally read the calendars on the phone, and check whether DAVx5 is installed), so this is a
+ * floor on how long that is shown, not an invented wait: enough for the answer to look like it was
+ * looked up, and short enough that nobody is kept waiting for it.
+ */
+private const val PreparingMillis = 800L
 
 @Composable
 fun OnboardingRoute(
@@ -89,7 +111,7 @@ fun OnboardingRoute(
             context,
             Manifest.permission.READ_CALENDAR,
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (granted) step = OnboardingStep.CALENDARS
+        if (granted) step = OnboardingStep.PREPARING
     }
 
     var notificationsEnabled by remember { mutableStateOf(hasNotificationPermission(context)) }
@@ -101,6 +123,13 @@ fun OnboardingRoute(
 
     LaunchedEffect(state.calendarPermissionGranted, step) {
         if (step == OnboardingStep.WELCOME && state.calendarPermissionGranted) {
+            step = OnboardingStep.PREPARING
+        }
+    }
+
+    LaunchedEffect(step) {
+        if (step == OnboardingStep.PREPARING) {
+            delay(PreparingMillis)
             step = OnboardingStep.CALENDARS
         }
     }
@@ -130,63 +159,83 @@ fun OnboardingRoute(
             StepProgress(
                 active = when (step) {
                     OnboardingStep.WELCOME -> 0
+                    // Already on the second segment: the wait is part of getting there, and a
+                    // progress bar that moves only once the waiting is over is not progress.
+                    OnboardingStep.PREPARING -> 1
                     OnboardingStep.CALENDARS -> 1
                     OnboardingStep.NOTIFICATIONS -> 2
                 },
             )
-            when (step) {
-                OnboardingStep.WELCOME -> WelcomeStep(
-                    onStart = {
-                        if (state.calendarPermissionGranted) {
-                            step = OnboardingStep.CALENDARS
-                        } else {
-                            calendarPermissionLauncher.launch(
-                                CalendarPermissionState.REQUIRED_PERMISSIONS,
-                            )
-                        }
-                    },
-                )
-                OnboardingStep.CALENDARS -> CalendarSetupStep(
-                    state = state,
-                    onUseLocal = viewModel::useLocalOnly,
-                    onUseExisting = viewModel::useExisting,
-                    onUseDavx = {
-                        viewModel.openDavxOrStore()
-                        viewModel.finishAfterSync()
-                    },
-                )
-                OnboardingStep.NOTIFICATIONS -> PersonalizeStep(
-                    completing = state.completing,
-                    themeMode = state.themeMode,
-                    onThemeSelect = viewModel::setThemeMode,
-                    accentColor = state.accentColor,
-                    accentCustomColor = state.accentCustomColor,
-                    onAccentSelect = viewModel::setAccentColor,
-                    onCustomAccentPick = viewModel::setCustomAccentColor,
-                    notificationsEnabled = notificationsEnabled,
-                    onNotificationsToggle = { want ->
-                        when {
-                            !want -> notificationsEnabled = false
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                !hasNotificationPermission(context) ->
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            else -> notificationsEnabled = true
-                        }
-                    },
-                    batteryOptimized = state.batteryOptimized,
-                    onOpenBatterySettings = {
-                        if (!viewModel.openBatterySettings()) {
-                            Toast.makeText(
-                                context,
-                                "This phone has no battery settings screen",
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    },
-                    mapsEnabled = state.mapsEnabled,
-                    onMapsToggle = viewModel::setMapsEnabled,
-                    onDone = viewModel::completeOnboarding,
-                )
+            AnimatedContent(
+                targetState = step,
+                // Each step arrives from the right and the one before it leaves to the left,
+                // so the sequence reads as forward motion rather than as screens being swapped.
+                transitionSpec = {
+                    (
+                        fadeIn(tween(Motion.DurationMedium)) +
+                            slideInHorizontally { width -> width / 6 }
+                        ) togetherWith (
+                        fadeOut(tween(Motion.DurationShort)) +
+                            slideOutHorizontally { width -> -width / 6 }
+                        ) using SizeTransform(clip = false)
+                },
+                label = "onboardingStep",
+            ) { current ->
+                when (current) {
+                    OnboardingStep.WELCOME -> WelcomeStep(
+                        onStart = {
+                            if (state.calendarPermissionGranted) {
+                                step = OnboardingStep.PREPARING
+                            } else {
+                                calendarPermissionLauncher.launch(
+                                    CalendarPermissionState.REQUIRED_PERMISSIONS,
+                                )
+                            }
+                        },
+                    )
+                    OnboardingStep.CALENDARS -> CalendarSetupStep(
+                        state = state,
+                        onUseLocal = viewModel::useLocalOnly,
+                        onUseExisting = viewModel::useExisting,
+                        onUseDavx = {
+                            viewModel.openDavxOrStore()
+                            viewModel.finishAfterSync()
+                        },
+                    )
+                    OnboardingStep.NOTIFICATIONS -> PersonalizeStep(
+                        completing = state.completing,
+                        themeMode = state.themeMode,
+                        onThemeSelect = viewModel::setThemeMode,
+                        accentColor = state.accentColor,
+                        accentCustomColor = state.accentCustomColor,
+                        onAccentSelect = viewModel::setAccentColor,
+                        onCustomAccentPick = viewModel::setCustomAccentColor,
+                        notificationsEnabled = notificationsEnabled,
+                        onNotificationsToggle = { want ->
+                            when {
+                                !want -> notificationsEnabled = false
+                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    !hasNotificationPermission(context) ->
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                else -> notificationsEnabled = true
+                            }
+                        },
+                        batteryOptimized = state.batteryOptimized,
+                        onOpenBatterySettings = {
+                            if (!viewModel.openBatterySettings()) {
+                                Toast.makeText(
+                                    context,
+                                    "This phone has no battery settings screen",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        },
+                        mapsEnabled = state.mapsEnabled,
+                        onMapsToggle = viewModel::setMapsEnabled,
+                        onDone = viewModel::completeOnboarding,
+                    )
+                    OnboardingStep.PREPARING -> PreparingStep()
+                }
             }
 
             if (state.completing) {
@@ -213,6 +262,26 @@ fun OnboardingRoute(
                 )
             }
         }
+    }
+}
+
+/** Held for [PreparingMillis] between granting access and being shown what was found. */
+@Composable
+private fun PreparingStep() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 72.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
+        Text(
+            "Checking what's on this phone\u2026",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
