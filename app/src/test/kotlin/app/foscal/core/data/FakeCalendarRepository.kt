@@ -122,6 +122,14 @@ class FakeCalendarRepository(
 
     override suspend fun ensureLocalCalendar(name: String, color: Int): Long? = 1L
 
+    /** Names handed to [createLocalCalendar], in order. */
+    val createdCalendars = mutableListOf<Pair<String, Int>>()
+
+    override suspend fun createLocalCalendar(name: String, color: Int): Long? {
+        createdCalendars += name to color
+        return 100L + createdCalendars.size
+    }
+
     override suspend fun setCalendarHidden(calendarId: Long, hidden: Boolean) = Unit
 
     override suspend fun createEvent(input: EventInput): Long? {

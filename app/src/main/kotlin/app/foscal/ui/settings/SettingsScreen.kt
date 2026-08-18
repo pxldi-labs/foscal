@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FileDownload
@@ -41,6 +43,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -52,6 +55,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -61,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -71,11 +76,13 @@ import app.foscal.core.model.Ics
 import app.foscal.core.model.ReminderDuration
 import app.foscal.core.model.ThemeMode
 import app.foscal.ics.IcsTransfer
+import app.foscal.ui.CalendarColors
 import app.foscal.ui.calendars.CalendarRow
 import app.foscal.ui.calendars.CalendarsUiState
 import app.foscal.ui.calendars.CalendarsViewModel
 import app.foscal.ui.calendars.TransferState
 import app.foscal.ui.common.ReminderDurationDialog
+import app.foscal.ui.contrastColor
 import app.foscal.ui.home.BehaviourViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,6 +99,7 @@ fun SettingsScreen(
     // One calendar open at a time: the per-calendar panel is tall, and several expanded at once
     // turns the list into something you have to scroll to find anything in.
     var expandedCalendarId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var addingCalendar by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -151,6 +159,7 @@ fun SettingsScreen(
                     viewModel = viewModel,
                     expandedCalendarId = expandedCalendarId,
                     onExpand = { id -> expandedCalendarId = if (expandedCalendarId == id) null else id },
+                    onAddCalendar = { addingCalendar = true },
                 )
                 SettingsSection.Reminders -> remindersSection(state, viewModel)
                 SettingsSection.Transfer -> item {
@@ -165,6 +174,20 @@ fun SettingsScreen(
                 }
                 SettingsSection.About -> item { AboutSection() }
             }
+        }
+
+        if (addingCalendar) {
+            AddCalendarDialog(
+                error = state.createError,
+                onDismiss = {
+                    addingCalendar = false
+                    viewModel.dismissCreateError()
+                },
+                onCreate = { name, color ->
+                    viewModel.createCalendar(name, color)
+                    addingCalendar = false
+                },
+            )
         }
     }
 }
@@ -245,6 +268,7 @@ private fun LazyListScope.calendarsSection(
     viewModel: CalendarsViewModel,
     expandedCalendarId: Long?,
     onExpand: (Long) -> Unit,
+    onAddCalendar: () -> Unit,
 ) {
     item {
         Text(
@@ -269,6 +293,16 @@ private fun LazyListScope.calendarsSection(
                         viewModel.setCalendarReminder(row.calendar.id, selection.value)
                 }
             },
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+    }
+    item {
+        ActionRow(
+            title = "Add a calendar",
+            subtitle = "Kept on this phone",
+            icon = Icons.Outlined.Add,
+            enabled = true,
+            onClick = onAddCalendar,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
     }
@@ -429,6 +463,97 @@ private fun ColorDot(colorArgb: Int) {
             .clip(CircleShape)
             .background(Color(colorArgb)),
     )
+}
+
+/**
+ * Name and colour for a calendar to be created on this device.
+ *
+ * Two fields and nothing else on purpose. Everything else a calendar row carries — account, sync
+ * setting, time zone — has exactly one possible answer for a calendar that lives only here, so
+ * asking would turn a two-second action into a form.
+ *
+ * The note about syncing is there because this is where someone comes looking to add their work
+ * calendar, and the honest answer is that no app can create that one for them: it is made on the
+ * server, and DAVx5 or the account's own app brings it down.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AddCalendarDialog(
+    error: String?,
+    onDismiss: () -> Unit,
+    onCreate: (String, Int) -> Unit,
+) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var color by rememberSaveable { mutableIntStateOf(CalendarColors.pick(0)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New calendar") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    CalendarColors.presets.forEach { swatch ->
+                        ColorSwatch(
+                            colorArgb = swatch,
+                            selected = swatch == color,
+                            onClick = { color = swatch },
+                        )
+                    }
+                }
+                Text(
+                    "Kept on this phone. Calendars that sync are made where they sync from.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (error != null) {
+                    Text(
+                        error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onCreate(name, color) },
+                enabled = name.isNotBlank(),
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ColorSwatch(colorArgb: Int, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(Color(colorArgb))
+            .clickable(role = Role.RadioButton, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = null,
+                tint = contrastColor(colorArgb),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -595,9 +720,10 @@ private fun ActionRow(
     icon: ImageVector,
     enabled: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
