@@ -99,6 +99,19 @@ interface CalendarRepository {
      */
     suspend fun ensureLocalCalendar(name: String, color: Int): Long?
 
+    /** How many events sit on [calendarId]. Shown before offering to delete it. */
+    suspend fun countEvents(calendarId: Long): Int
+
+    /**
+     * Removes a calendar this app owns, and every event on it.
+     *
+     * Only calendars on the app's own local account can go. A calendar that syncs belongs to the
+     * account it came from: deleting it here would either be undone by the next sync or, worse,
+     * pushed to the server as the user deleting it everywhere. Those are removed where they are
+     * made. Returns false when [calendarId] is not local, or is already gone.
+     */
+    suspend fun deleteLocalCalendar(calendarId: Long): Boolean
+
     /**
      * Adds a new calendar on this device, returning its id.
      *
@@ -424,6 +437,58 @@ class CalendarContractRepository @Inject constructor(
         arrayOf(CalendarContract.ACCOUNT_TYPE_LOCAL, LOCAL_ACCOUNT_NAME),
         "${CalendarContract.Calendars._ID} ASC",
     )?.use { c -> if (c.moveToFirst()) c.getLong(0) else null }
+
+    override suspend fun countEvents(calendarId: Long): Int = withContext(Dispatchers.IO) {
+        safeQuery(
+            CalendarContract.Events.CONTENT_URI,
+            arrayOf(CalendarContract.Events._ID),
+            "${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.DELETED} = 0",
+            arrayOf(calendarId.toString()),
+            null,
+        )?.use { it.count } ?: 0
+    }
+
+    override suspend fun deleteLocalCalendar(calendarId: Long): Boolean =
+        withContext(Dispatchers.IO) {
+            // Checked here rather than trusted from the caller: this is the one operation in the
+            // app that destroys data it cannot put back, and a synced calendar reaching it would
+            // be a deletion the user never asked for on every other device they own.
+            val account = localAccountOf(calendarId) ?: return@withContext false
+            // Without the sync-adapter flag the provider only marks the row deleted and waits for
+            // an adapter to finish the job. Nothing syncs a local calendar, so it would sit there
+            // as a tombstone for ever.
+            val uri = ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, calendarId)
+                .buildUpon()
+                .appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
+                .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_NAME, account)
+                .appendQueryParameter(
+                    CalendarContract.Calendars.ACCOUNT_TYPE,
+                    CalendarContract.ACCOUNT_TYPE_LOCAL,
+                )
+                .build()
+            safeDelete(uri, null, null) > 0
+        }
+
+    /**
+     * The account name of [calendarId] when it is a local calendar, null when it is not.
+     *
+     * Its own name, not this app's: the provider checks the account on the URI against the row,
+     * and a local calendar some other app made — they do not all use the same name — would refuse
+     * the delete if we insisted it was ours.
+     */
+    private fun localAccountOf(calendarId: Long): String? = safeQuery(
+        CalendarContract.Calendars.CONTENT_URI,
+        arrayOf(CalendarContract.Calendars.ACCOUNT_NAME, CalendarContract.Calendars.ACCOUNT_TYPE),
+        "${CalendarContract.Calendars._ID} = ?",
+        arrayOf(calendarId.toString()),
+        null,
+    )?.use { c ->
+        if (c.moveToFirst() && c.getString(1) == CalendarContract.ACCOUNT_TYPE_LOCAL) {
+            c.getString(0)
+        } else {
+            null
+        }
+    }
 
     override suspend fun setCalendarHidden(calendarId: Long, hidden: Boolean) {
         withContext(Dispatchers.IO) {

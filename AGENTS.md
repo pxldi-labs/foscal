@@ -178,6 +178,13 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   with the rest of the UI whenever the user has forced Light or Dark in Settings. The only
   legitimate callers of `isSystemInDarkTheme()` are `MainActivity`, where `ThemeMode.SYSTEM`
   is resolved into the `darkTheme` argument, and that parameter's own default.
+- **Deleting a calendar** — only ones on the app's own local account, guarded both in the UI
+  (`CalendarRowCard` shows the button only when `calendar.isLocal`) and again in
+  `CalendarRepository.deleteLocalCalendar`. A calendar that syncs belongs to the account it came
+  from: removing it here would either be undone by the next sync or pushed to the server as the
+  user deleting it everywhere. The delete URI needs `CALLER_IS_SYNCADAPTER` — without it the
+  provider only tombstones the row and waits for an adapter that is never coming — and the
+  account name on the URI has to be the row's own, not this app's, or the provider refuses.
 - **Opening from other apps** — every intent the app answers is parsed in one place,
   `IntentRoute.kt`, into an `IntentRoute` that `FoscalNavHost` acts on. `routeFor(RouteRequest)`
   holds the rules over plain data so they can be unit-tested without an `Intent`; the

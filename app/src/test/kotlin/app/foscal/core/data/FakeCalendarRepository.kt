@@ -125,6 +125,19 @@ class FakeCalendarRepository(
     /** Names handed to [createLocalCalendar], in order. */
     val createdCalendars = mutableListOf<Pair<String, Int>>()
 
+    /** Ids handed to [deleteLocalCalendar], in order. */
+    val deletedCalendars = mutableListOf<Long>()
+
+    /** What [countEvents] should answer, per calendar id. */
+    val eventCounts = mutableMapOf<Long, Int>()
+
+    override suspend fun countEvents(calendarId: Long): Int = eventCounts[calendarId] ?: 0
+
+    override suspend fun deleteLocalCalendar(calendarId: Long): Boolean {
+        deletedCalendars += calendarId
+        return calendars.any { it.id == calendarId && it.isLocal }
+    }
+
     override suspend fun createLocalCalendar(name: String, color: Int): Long? {
         createdCalendars += name to color
         return 100L + createdCalendars.size
