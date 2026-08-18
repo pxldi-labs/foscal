@@ -133,7 +133,14 @@ private fun DragSheet(
 ) {
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            // The window has to reach past the navigation bar or the sheet's own colour stops
+            // short of the bottom of the screen, leaving a strip of the page showing under it when
+            // the sheet is pulled all the way up. The contents are kept clear of the bar by
+            // padding instead, so the colour goes behind it and the rows do not.
+            decorFitsSystemWindows = false,
+        ),
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val density = LocalDensity.current
