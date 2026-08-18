@@ -2,6 +2,8 @@ package app.foscal.ui.calendars
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,7 +64,9 @@ fun ImportIcsDialog(
 
                 calendars.isEmpty() -> Text("There is no calendar to import into yet.")
 
-                else -> Column {
+                // Scrollable because this list is however many calendars the phone has, and an
+                // incoming file is exactly when the user cannot go and tidy them up first.
+                else -> Column(Modifier.verticalScroll(rememberScrollState())) {
                     calendars.forEach { calendar ->
                         Row(
                             modifier = Modifier
