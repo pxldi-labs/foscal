@@ -248,7 +248,7 @@ private fun WelcomeStep(onStart: () -> Unit) {
         Spacer(Modifier.height(30.dp))
         FoscalWordmark()
         Text(
-            "Your calendars, on your phone and nowhere else.",
+            "A calendar that stays out of your way.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -265,7 +265,7 @@ private fun WelcomeStep(onStart: () -> Unit) {
             Text("Get started", fontWeight = FontWeight.SemiBold)
         }
         Text(
-            "No account needed · Open source",
+            "No account needed",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 14.dp),
@@ -295,7 +295,7 @@ private fun CalendarSetupStep(
         ChoiceCard(
             icon = Icons.Outlined.DevicesOther,
             title = "Start fresh",
-            subtitle = "A new calendar, kept on this phone.",
+            subtitle = "A new calendar on this phone.",
             buttonText = "Create calendar",
             enabled = !state.completing,
             onClick = onUseLocal,
@@ -303,7 +303,7 @@ private fun CalendarSetupStep(
         ChoiceCard(
             icon = Icons.Outlined.CalendarMonth,
             title = "Use what's already here",
-            subtitle = "The calendars your phone already has.",
+            subtitle = "The ones your phone already has.",
             buttonText = "Continue",
             enabled = !state.completing,
             onClick = onUseExisting,
@@ -312,7 +312,7 @@ private fun CalendarSetupStep(
             icon = Icons.Outlined.CloudSync,
             title = "Sync with CalDAV",
             subtitle = if (state.davxStatus == DAVxStatus.INSTALLED) {
-                "Add Nextcloud, ownCloud or another account through DAVx5."
+                "Nextcloud, ownCloud and the rest, through DAVx5."
             } else {
                 "Needs DAVx5, free on F-Droid."
             },
@@ -372,8 +372,8 @@ private fun PersonalizeStep(
             ActionCard(
                 icon = Icons.Outlined.BatteryAlert,
                 title = "Reminders may arrive late",
-                subtitle = "Android's battery saver holds them back until the phone wakes. " +
-                    "Set Foscal to unrestricted — it only wakes when a reminder is due.",
+                subtitle = "Battery saver holds them back until the phone wakes. Set Foscal to " +
+                    "unrestricted to fix it.",
                 buttonText = "Open battery settings",
                 onClick = onOpenBatterySettings,
             )
@@ -381,9 +381,7 @@ private fun PersonalizeStep(
         ToggleCard(
             icon = Icons.Outlined.Map,
             title = "Pick locations on a map",
-            subtitle = "Tap a place instead of typing it. This is the only part of Foscal that " +
-                "uses the internet: OpenStreetMap sees your IP and what you search for. " +
-                "Everything else stays offline.",
+            subtitle = "Tap a place instead of typing it. Your search goes to OpenStreetMap.",
             checked = mapsEnabled,
             onToggle = onMapsToggle,
         )
