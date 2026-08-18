@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Settings
@@ -58,7 +60,16 @@ fun ViewSheet(
         sheetState = rememberModalBottomSheetState(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Column(modifier = Modifier.padding(bottom = 28.dp)) {
+        // The sheet scrolls, not a panel inside it. A scrollable child is what the sheet's own
+        // nested-scroll connection is built to work with: the drag moves the sheet until it is
+        // fully open and scrolls the contents after that, from one gesture. Scrolling only the
+        // calendar list left the sheet to fight the drag by itself, which on a phone with a lot of
+        // calendars is what made it lurch between its resting heights.
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 28.dp),
+        ) {
             ViewRow(current = current, onSelect = onSelect)
             SheetDivider()
             SectionLabel("Calendars")
