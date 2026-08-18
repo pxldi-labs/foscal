@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FileDownload
@@ -165,6 +166,7 @@ fun SettingsScreen(
                     expandedCalendarId = expandedCalendarId,
                     onExpand = { id -> expandedCalendarId = if (expandedCalendarId == id) null else id },
                     onAddCalendar = { addingCalendar = true },
+                    onEditCalendar = { cal -> viewModel.startEdit(cal.id, cal.displayName, cal.color) },
                     onDeleteCalendar = { cal -> viewModel.confirmDelete(cal.id, cal.displayName) },
                 )
                 SettingsSection.Reminders -> remindersSection(state, viewModel)
@@ -183,15 +185,33 @@ fun SettingsScreen(
         }
 
         if (addingCalendar) {
-            AddCalendarDialog(
+            CalendarDialog(
+                title = "New calendar",
+                confirmLabel = "Add",
+                initialName = "",
+                initialColor = CalendarColors.pick(0),
                 error = state.createError,
                 onDismiss = {
                     addingCalendar = false
                     viewModel.dismissCreateError()
                 },
-                onCreate = { name, color ->
+                onConfirm = { name, color ->
                     viewModel.createCalendar(name, color)
                     addingCalendar = false
+                },
+            )
+        }
+
+        state.editing?.let { editing ->
+            CalendarDialog(
+                title = "Edit calendar",
+                confirmLabel = "Save",
+                initialName = editing.name,
+                initialColor = editing.color,
+                error = state.createError,
+                onDismiss = viewModel::dismissEdit,
+                onConfirm = { name, color ->
+                    viewModel.saveCalendar(editing.calendarId, name, color)
                 },
             )
         }
@@ -283,6 +303,7 @@ private fun LazyListScope.calendarsSection(
     expandedCalendarId: Long?,
     onExpand: (Long) -> Unit,
     onAddCalendar: () -> Unit,
+    onEditCalendar: (Calendar) -> Unit,
     onDeleteCalendar: (Calendar) -> Unit,
 ) {
     item {
@@ -300,6 +321,7 @@ private fun LazyListScope.calendarsSection(
             expanded = expandedCalendarId == row.calendar.id,
             onExpand = { onExpand(row.calendar.id) },
             onToggleHidden = { viewModel.toggleHidden(row) },
+            onEdit = { onEditCalendar(row.calendar) },
             onDelete = { onDeleteCalendar(row.calendar) },
             onSelectReminder = { selection ->
                 when (selection) {
@@ -321,6 +343,18 @@ private fun LazyListScope.calendarsSection(
             onClick = onAddCalendar,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
+    }
+    // Here rather than only inside the dialogs: both of them close before the write comes back, so
+    // a failure reported into a dialog is a failure reported to nobody.
+    state.createError?.let { error ->
+        item {
+            Text(
+                error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
     }
 }
 
@@ -389,6 +423,7 @@ private fun CalendarRowCard(
     expanded: Boolean,
     onExpand: () -> Unit,
     onToggleHidden: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSelectReminder: (ReminderSelection) -> Unit,
     modifier: Modifier = Modifier,
@@ -466,6 +501,15 @@ private fun CalendarRowCard(
                     // or pushed to the server as the user deleting it on all their devices.
                     if (calendar.isLocal) {
                         HorizontalDivider(Modifier.padding(top = 6.dp))
+                        TextButton(onClick = onEdit) {
+                            Icon(
+                                Icons.Outlined.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Rename or recolour")
+                        }
                         TextButton(
                             onClick = onDelete,
                             colors = ButtonDefaults.textButtonColors(
@@ -554,16 +598,20 @@ private fun DeleteCalendarDialog(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AddCalendarDialog(
+private fun CalendarDialog(
+    title: String,
+    confirmLabel: String,
+    initialName: String,
+    initialColor: Int,
     error: String?,
     onDismiss: () -> Unit,
-    onCreate: (String, Int) -> Unit,
+    onConfirm: (String, Int) -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var color by rememberSaveable { mutableIntStateOf(CalendarColors.pick(0)) }
+    var name by rememberSaveable(initialName) { mutableStateOf(initialName) }
+    var color by rememberSaveable(initialColor) { mutableIntStateOf(initialColor) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New calendar") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
@@ -586,7 +634,8 @@ private fun AddCalendarDialog(
                     }
                 }
                 Text(
-                    "Kept on this phone. Calendars that sync are made where they sync from.",
+                    "Kept on this phone. Calendars that sync are named and coloured where they " +
+                        "sync from.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -601,10 +650,10 @@ private fun AddCalendarDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onCreate(name, color) },
+                onClick = { onConfirm(name, color) },
                 enabled = name.isNotBlank(),
             ) {
-                Text("Add")
+                Text(confirmLabel)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },

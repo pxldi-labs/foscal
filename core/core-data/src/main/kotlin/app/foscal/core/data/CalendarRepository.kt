@@ -99,6 +99,16 @@ interface CalendarRepository {
      */
     suspend fun ensureLocalCalendar(name: String, color: Int): Long?
 
+    /**
+     * Renames and recolours a calendar this app owns.
+     *
+     * Local only, for the same reason as [deleteLocalCalendar]: the name and colour of a calendar
+     * that syncs come from the account it came from, so a change here would be overwritten by the
+     * next sync or pushed out as a change the user made everywhere. Returns false when
+     * [calendarId] is not local, or is already gone.
+     */
+    suspend fun updateLocalCalendar(calendarId: Long, name: String, color: Int): Boolean
+
     /** How many events sit on [calendarId]. Shown before offering to delete it. */
     suspend fun countEvents(calendarId: Long): Int
 
@@ -437,6 +447,30 @@ class CalendarContractRepository @Inject constructor(
         arrayOf(CalendarContract.ACCOUNT_TYPE_LOCAL, LOCAL_ACCOUNT_NAME),
         "${CalendarContract.Calendars._ID} ASC",
     )?.use { c -> if (c.moveToFirst()) c.getLong(0) else null }
+
+    override suspend fun updateLocalCalendar(calendarId: Long, name: String, color: Int): Boolean =
+        withContext(Dispatchers.IO) {
+            val account = localAccountOf(calendarId) ?: return@withContext false
+            val values = ContentValues().apply {
+                // Both, because they are two different things to the provider: NAME is the
+                // calendar's identity to its sync adapter and DISPLAY_NAME is what gets shown.
+                // A local calendar has no adapter to disagree with, and leaving NAME on the old
+                // value would strand the rename anywhere the identity is what gets read.
+                put(CalendarContract.Calendars.NAME, name)
+                put(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME, name)
+                put(CalendarContract.Calendars.CALENDAR_COLOR, color)
+            }
+            val uri = ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, calendarId)
+                .buildUpon()
+                .appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
+                .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_NAME, account)
+                .appendQueryParameter(
+                    CalendarContract.Calendars.ACCOUNT_TYPE,
+                    CalendarContract.ACCOUNT_TYPE_LOCAL,
+                )
+                .build()
+            safeUpdate(uri, values, null, null) > 0
+        }
 
     override suspend fun countEvents(calendarId: Long): Int = withContext(Dispatchers.IO) {
         safeQuery(

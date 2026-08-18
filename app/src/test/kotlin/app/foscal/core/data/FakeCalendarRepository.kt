@@ -125,6 +125,14 @@ class FakeCalendarRepository(
     /** Names handed to [createLocalCalendar], in order. */
     val createdCalendars = mutableListOf<Pair<String, Int>>()
 
+    /** Every edit handed to [updateLocalCalendar], in order. */
+    val updatedCalendars = mutableListOf<Triple<Long, String, Int>>()
+
+    override suspend fun updateLocalCalendar(calendarId: Long, name: String, color: Int): Boolean {
+        updatedCalendars += Triple(calendarId, name, color)
+        return calendars.any { it.id == calendarId && it.isLocal }
+    }
+
     /** Ids handed to [deleteLocalCalendar], in order. */
     val deletedCalendars = mutableListOf<Long>()
 
