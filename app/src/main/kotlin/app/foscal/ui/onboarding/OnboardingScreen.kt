@@ -687,7 +687,7 @@ private fun FoscalWordmark() {
 }
 
 /**
- * The Foscal glyph: the chambered-ammonite mark on a brand-blue squircle. Renders the
+ * The Foscal glyph: the month-grid mark on the deep-ink squircle. Renders the
  * self-contained badge drawable so the in-app mark and the home-screen launcher icon
  * stay pixel-identical.
  */
