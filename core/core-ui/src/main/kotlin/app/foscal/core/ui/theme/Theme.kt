@@ -133,7 +133,29 @@ fun customAccentTokens(seed: Color): AccentTokens = AccentTokens(
     onSecondaryContainerDark = lerp(seed, Color.White, 0.72f),
 )
 
-/** Weekend day-of-week label color, adjusted so the gold stays legible on the dark surface. */
+/**
+ * Amber where it is drawn as text rather than as a fill — weekend labels, today's weekday.
+ *
+ * The light form is the brand amber darkened until it clears 4.5:1 on white. The gold this
+ * replaced sat at 2.5:1, which was both off-palette and not actually readable.
+ */
+@Composable
+fun amberTextColor(darkTheme: Boolean = LocalIsDarkTheme.current): Color =
+    if (darkTheme) AmberTextDark else AmberTextLight
+
+/** Weekend day-of-week label colour. */
 @Composable
 fun weekendLabelColor(darkTheme: Boolean = LocalIsDarkTheme.current): Color =
-    if (darkTheme) WeekendGoldDark else WeekendGoldLight
+    amberTextColor(darkTheme)
+
+/**
+ * The filled disc marking today, and the ink on it.
+ *
+ * Amber rather than the accent, so the icon on the home screen is a literal preview of the app —
+ * and so that today stops looking like a selected day, which was the other blue disc.
+ */
+@Composable
+fun todayDiscColor(): Color = FoscalAmber
+
+@Composable
+fun onTodayDiscColor(): Color = AmberInk

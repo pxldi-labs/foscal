@@ -87,10 +87,20 @@ val ForestAccent = AccentTokens(
     onSecondaryContainerDark = Color(0xFFDBF2E7),
 )
 
-// Weekend day-of-week labels. Muted gold in light; a lighter amber that survives the dark
-// background instead of the near-black gold used before.
-val WeekendGoldLight = Color(0xFFB9A24B)
-val WeekendGoldDark = Color(0xFFCBB667)
+/**
+ * Amber — the day the launcher icon marks, and the day the app marks.
+ *
+ * A fill only. At 1.5:1 against a white surface it can never be a line, a label or an outline;
+ * with dark ink on it, it is 9.8:1, which is better than the blue disc it replaced. [AmberInk] is
+ * that ink, and [AmberTextLight] is the darkened form for the places that need amber *as* text.
+ */
+val FoscalAmber = Color(0xFFFFC94D)
+val AmberInk = Color(0xFF19205D)
+
+// Amber where it has to be text rather than a fill: darkened until it clears 4.5:1 on white
+// (4.62:1), and left alone in dark where the undarkened colour is already 11.2:1.
+val AmberTextLight = Color(0xFF8F712B)
+val AmberTextDark = Color(0xFFFFC94D)
 
 val FoscalLightBackground = Color(0xFFF4F6FA)
 val FoscalLightSurface = Color(0xFFFFFFFF)

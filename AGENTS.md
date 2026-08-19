@@ -217,7 +217,10 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   tab `#8691F7`. The grid dots are drawn in the ground colour so they read as punched
   through the card rather than printed on it. The first two are also the Cobalt accent's
   primary and secondary in `:core-ui`, so the app matches the icon that opened it; the
-  amber is an icon colour only, since at 1.6:1 on white it can be a fill and never text. These are the mark's own colours and are deliberately separate from
+  amber marks today in both: `todayDiscColor()` fills the disc and `onTodayDiscColor()` is
+  the ink on it. Amber is a *fill* — at 1.5:1 on white it can never be a line or a label, so
+  anywhere it has to be text (weekend labels, today's weekday in the agenda) uses
+  `amberTextColor()`, the darkened form that clears 4.5:1. These are the mark's own colours and are deliberately separate from
   the Material scheme in `:core-ui` and from the per-calendar colours in
   `ui/CalendarColors.kt`.
 - Time is **24-hour by default** (`HH:mm`), but the user can switch to 12-hour in

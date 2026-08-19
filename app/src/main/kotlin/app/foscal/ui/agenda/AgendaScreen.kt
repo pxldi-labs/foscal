@@ -47,6 +47,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.core.model.Event
 import app.foscal.core.ui.theme.BricolageFamily
+import app.foscal.core.ui.theme.amberTextColor
+import app.foscal.core.ui.theme.onTodayDiscColor
+import app.foscal.core.ui.theme.todayDiscColor
 import app.foscal.ui.util.Dates
 import app.foscal.ui.util.LocalUse24HourClock
 import app.foscal.ui.util.currentLocale
@@ -300,7 +303,7 @@ private fun AgendaDateGutter(date: LocalDate, isToday: Boolean) {
                     if (isToday) {
                         Modifier
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
+                            .background(todayDiscColor())
                     } else {
                         Modifier
                     },
@@ -312,7 +315,7 @@ private fun AgendaDateGutter(date: LocalDate, isToday: Boolean) {
                 style = MaterialTheme.typography.titleLarge,
                 fontFamily = BricolageFamily,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isToday) MaterialTheme.colorScheme.onPrimary
+                color = if (isToday) onTodayDiscColor()
                 else MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -320,7 +323,8 @@ private fun AgendaDateGutter(date: LocalDate, isToday: Boolean) {
             text = date.format(rememberDateFormatter("EEE")),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isToday) MaterialTheme.colorScheme.primary
+            // Amber as text, so the darkened form: the disc colour is 1.5:1 on this surface.
+            color = if (isToday) amberTextColor()
             else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

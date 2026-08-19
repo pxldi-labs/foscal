@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.core.ui.theme.Motion
+import app.foscal.core.ui.theme.onTodayDiscColor
+import app.foscal.core.ui.theme.todayDiscColor
 import app.foscal.ui.common.TimelineDay
 import app.foscal.ui.common.TimelineEndInset
 import app.foscal.ui.common.TimelineGutterWidth
@@ -231,7 +233,7 @@ private fun TimelineDayHeader(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
-                        .background(if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent)
+                        .background(if (isToday) todayDiscColor() else Color.Transparent)
                         .padding(horizontal = 11.dp, vertical = 7.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -239,7 +241,7 @@ private fun TimelineDayHeader(
                         date.dayOfMonth.toString(),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isToday) MaterialTheme.colorScheme.onPrimary
+                        color = if (isToday) onTodayDiscColor()
                         else MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
                     )
