@@ -2,6 +2,7 @@ package app.foscal.ui.common
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.foscal.core.model.Event
+import app.foscal.core.ui.theme.LocalIsDarkTheme
 import app.foscal.ui.eventColors
 import app.foscal.ui.util.LocalUse24HourClock
 import app.foscal.ui.util.currentLocale
@@ -150,6 +152,14 @@ fun TimelineLayout(
     val nowZ = liveNow.atZone(zone)
     val nowFractionalHour = nowZ.hour + nowZ.minute / 60f
     val gridColor = MaterialTheme.colorScheme.outlineVariant
+    // The hour lines are a ruler, not a border: they only have to be findable when you look for
+    // them. A solid outline colour turns the grid into the loudest thing on an empty day. Ink in
+    // light, white in dark — a dark grey line on a dark background reads as dirt.
+    val hourLineColor = if (LocalIsDarkTheme.current) {
+        Color.White.copy(alpha = 0.10f)
+    } else {
+        Color.Black.copy(alpha = 0.06f)
+    }
     val nowColor = MaterialTheme.colorScheme.error
     val todayTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
     val allDayEvents = days.flatMap { day -> day.events.filter { it.allDay } }
@@ -280,26 +290,10 @@ fun TimelineLayout(
                                 val hourPx = hourHeight.toPx()
                                 for (h in 1..23) {
                                     drawLine(
-                                        color = gridColor,
+                                        color = hourLineColor,
                                         start = Offset(0f, h * hourPx),
                                         end = Offset(size.width, h * hourPx),
                                         strokeWidth = 0.5f,
-                                    )
-                                }
-                            }
-                            if (day.date == today) {
-                                val nowY = nowFractionalHour * with(density) { hourHeight.toPx() }
-                                Canvas(Modifier.fillMaxSize()) {
-                                    drawLine(
-                                        color = nowColor,
-                                        start = Offset(0f, nowY),
-                                        end = Offset(size.width, nowY),
-                                        strokeWidth = 1.5f,
-                                    )
-                                    drawCircle(
-                                        color = nowColor,
-                                        radius = 4.5f,
-                                        center = Offset(0f, nowY),
                                     )
                                 }
                             }
@@ -324,7 +318,11 @@ fun TimelineLayout(
                                 layoutTimed(day.events, hourHeight, zone)
                             }
                             positioned.forEach { pe ->
-                                val eachWidth = (colWidth / pe.columnCount) - 2.dp
+                                // Fractions of the day column, not a column index: a nested
+                                // event keeps its container's right edge and only gives up ground
+                                // on the left.
+                                val blockLeft = colWidth * pe.leftFraction + 1.dp
+                                val blockWidth = colWidth * pe.widthFraction - 2.dp
                                 val drag = eventDrag?.takeIf {
                                     it.eventId == pe.event.id &&
                                         it.instanceStartMillis == pe.event.start.toEpochMilli()
@@ -336,13 +334,13 @@ fun TimelineLayout(
                                     compact = compact,
                                     accentStripe = accentStripe,
                                     cornerRadius = blockCornerRadius,
+                                    nested = pe.depth > 0,
                                     modifier = Modifier
                                         .offset(
-                                            x = eachWidth * pe.column + 1.dp +
-                                                colWidth * (drag?.deltaDays ?: 0),
+                                            x = blockLeft + colWidth * (drag?.deltaDays ?: 0),
                                             y = pe.topDp + hourHeight * ((drag?.deltaMinutes ?: 0) / 60f),
                                         )
-                                        .width(eachWidth)
+                                        .width(blockWidth)
                                         // A block is drawn slightly shorter than its slot, so two
                                         // events that touch in time still have a seam between them.
                                         // Without it 08:30-12:00 and 12:00-13:00 render as one
@@ -380,10 +378,29 @@ fun TimelineLayout(
                                     onMovePreviewEnd = { eventDrag = null },
                                     dayIndex = dayIndex,
                                     visibleDayCount = timedDays.size,
-                                    eventLeftInDay = eachWidth * pe.column + 1.dp,
+                                    eventLeftInDay = blockLeft,
                                     dayWidth = colWidth,
                                     hourHeight = hourHeight,
                                 )
+                            }
+                            // Last, so it crosses the blocks instead of hiding behind them. The
+                            // whole point of the line is to say where you are in a day that is
+                            // mostly full of events; underneath them it only shows in the gaps.
+                            if (day.date == today) {
+                                val nowY = nowFractionalHour * with(density) { hourHeight.toPx() }
+                                Canvas(Modifier.fillMaxSize()) {
+                                    drawLine(
+                                        color = nowColor,
+                                        start = Offset(0f, nowY),
+                                        end = Offset(size.width, nowY),
+                                        strokeWidth = 1.5f,
+                                    )
+                                    drawCircle(
+                                        color = nowColor,
+                                        radius = 4.5f,
+                                        center = Offset(0f, nowY),
+                                    )
+                                }
                             }
                         }
                     }
@@ -557,6 +574,7 @@ private fun EventBlock(
     compact: Boolean,
     accentStripe: Boolean,
     cornerRadius: Dp,
+    nested: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onMove: ((deltaDays: Int, deltaMinutes: Int) -> Unit)? = null,
@@ -595,6 +613,19 @@ private fun EventBlock(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
             .background(colors.container)
+            // A block sitting inside another one is the same colour as the thing underneath it, so
+            // without an outline the pair reads as a single shape with a caption halfway down.
+            .then(
+                if (nested) {
+                    Modifier.border(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(cornerRadius),
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .then(
                 if (onMove != null) {
                     Modifier.pointerInput(event.id, event.start, eventLeftInDay, dayWidth, hourHeight) {
@@ -674,13 +705,27 @@ private fun EventBlock(
     }
 }
 
+/**
+ * One event's box inside a day column, expressed as fractions of that column's width.
+ *
+ * Fractions rather than a column index because an event nested inside another does not get a
+ * column of its own: it keeps its container's right edge and only gives up ground on the left,
+ * drawn on top. An index-based layout has no way to say that — it can only halve the column, which
+ * is what turned a full-width "Arbeit" into a 24dp ribbon reading "Ar / bei / t" as soon as a
+ * 45-minute break was booked inside it.
+ */
 internal data class PositionedEvent(
     val event: Event,
-    val column: Int,
-    val columnCount: Int,
+    val leftFraction: Float,
+    val widthFraction: Float,
+    /** 0 for an event nothing contains. Deeper events are drawn later, so they land on top. */
+    val depth: Int,
     val topDp: Dp,
     val heightDp: Dp,
 )
+
+/** How much of its container's width a nested event gives up on the left. */
+private const val NestIndent = 0.12f
 
 internal fun layoutTimed(
     events: List<Event>,
@@ -688,54 +733,113 @@ internal fun layoutTimed(
     zone: ZoneId,
 ): List<PositionedEvent> {
     if (events.isEmpty()) return emptyList()
-    val sorted = events.sortedBy { it.start }
-    val clusters = mutableListOf<MutableList<Event>>()
-    var clusterEnd = Long.MIN_VALUE
-    for (e in sorted) {
-        if (clusters.isEmpty() || e.start.toEpochMilli() >= clusterEnd) {
-            clusters.add(mutableListOf(e))
-            clusterEnd = e.end.toEpochMilli()
-        } else {
-            clusters.last().add(e)
-            clusterEnd = maxOf(clusterEnd, e.end.toEpochMilli())
-        }
-    }
+    // Longest first among events that start together, so a container is always seen before the
+    // things inside it and the containment stack below never has to look backwards.
+    val sorted = events.sortedWith(compareBy<Event> { it.start }.thenByDescending { it.end })
+    val children = nestingOf(sorted)
     val out = mutableListOf<PositionedEvent>()
-    for (cluster in clusters) {
-        val columnEnds = mutableListOf<Long>()
-        val eventColumns = mutableListOf<Pair<Event, Int>>()
-        for (e in cluster.sortedBy { it.start }) {
-            var placed = false
-            for (i in columnEnds.indices) {
-                if (columnEnds[i] <= e.start.toEpochMilli()) {
-                    columnEnds[i] = e.end.toEpochMilli()
-                    eventColumns.add(e to i)
-                    placed = true
-                    break
-                }
-            }
-            if (!placed) {
-                columnEnds.add(e.end.toEpochMilli())
-                eventColumns.add(e to columnEnds.size - 1)
-            }
-        }
-        val totalCols = columnEnds.size
-        for ((e, col) in eventColumns) {
-            val startZ = e.start.atZone(zone)
-            val endZ = e.end.atZone(zone)
-            val startFrac = (startZ.hour + startZ.minute / 60f + startZ.second / 3600f)
-                .coerceIn(0f, 24f)
-            // Keep a minimum visible slice, but never let the lower bound exceed 24h — an event
-            // starting after 23:45 would otherwise make coerceIn's range empty and crash.
-            val endFrac = (endZ.hour + endZ.minute / 60f + endZ.second / 3600f)
-                .coerceIn((startFrac + 0.25f).coerceAtMost(24f), 24f)
-            val top = hourHeight * startFrac
-            // Enough for one line of small text and no more. It used to be 32dp, which is over
-            // half an hour of grid: a quarter-hour event was inflated to twice its length and
-            // drawn straight over whatever started when it ended.
-            val height = (hourHeight * (endFrac - startFrac)).coerceAtLeast(16.dp)
-            out.add(PositionedEvent(e, col, totalCols, top, height))
+    place(children[sorted.size], sorted, children, 0f, 1f, 0, hourHeight, zone, out)
+    // Painter's order: a nested block has to be drawn after the block it sits inside.
+    return out.sortedBy { it.depth }
+}
+
+/**
+ * Indices of the events directly inside each event; roots live at index `sorted.size`.
+ *
+ * Works as a stack because [sorted] is in start order: once the innermost open container no longer
+ * encloses the event we are placing, nothing deeper can either.
+ */
+private fun nestingOf(sorted: List<Event>): List<MutableList<Int>> {
+    val children = List(sorted.size + 1) { mutableListOf<Int>() }
+    val open = ArrayDeque<Int>()
+    for (i in sorted.indices) {
+        while (open.isNotEmpty() && !encloses(sorted[open.last()], sorted[i])) open.removeLast()
+        children[open.lastOrNull() ?: sorted.size].add(i)
+        open.addLast(i)
+    }
+    return children
+}
+
+/**
+ * Whether [outer] wholly contains [inner] *and* is strictly larger.
+ *
+ * Two events on exactly the same slot enclose each other by the loose reading, which would make one
+ * of them a child of the other for no reason. They are peers, and peers go side by side.
+ */
+private fun encloses(outer: Event, inner: Event): Boolean =
+    outer.start <= inner.start && outer.end >= inner.end &&
+        (outer.start < inner.start || outer.end > inner.end)
+
+/**
+ * Lay a set of sibling events out across the band `[left, right)` and recurse into what they hold.
+ *
+ * Siblings that genuinely overlap in time still go side by side — there is no other honest way to
+ * show two half-overlapping meetings — but one that ends before the next begins gets its column
+ * back, so a day of back-to-back events stays full width.
+ */
+@Suppress("LongParameterList")
+private fun place(
+    group: List<Int>,
+    sorted: List<Event>,
+    children: List<List<Int>>,
+    left: Float,
+    right: Float,
+    depth: Int,
+    hourHeight: Dp,
+    zone: ZoneId,
+    out: MutableList<PositionedEvent>,
+) {
+    if (group.isEmpty()) return
+    val columnEnds = mutableListOf<Long>()
+    val columnOf = mutableMapOf<Int, Int>()
+    for (i in group) {
+        val e = sorted[i]
+        val free = columnEnds.indices.firstOrNull { columnEnds[it] <= e.start.toEpochMilli() }
+        if (free != null) {
+            columnEnds[free] = e.end.toEpochMilli()
+            columnOf[i] = free
+        } else {
+            columnEnds.add(e.end.toEpochMilli())
+            columnOf[i] = columnEnds.size - 1
         }
     }
-    return out
+    val slot = (right - left) / columnEnds.size
+    for (i in group) {
+        val e = sorted[i]
+        val blockLeft = left + slot * columnOf.getValue(i)
+        val blockRight = blockLeft + slot
+        val startZ = e.start.atZone(zone)
+        val endZ = e.end.atZone(zone)
+        val startFrac = (startZ.hour + startZ.minute / 60f + startZ.second / 3600f)
+            .coerceIn(0f, 24f)
+        // Keep a minimum visible slice, but never let the lower bound exceed 24h — an event
+        // starting after 23:45 would otherwise make coerceIn's range empty and crash.
+        val endFrac = (endZ.hour + endZ.minute / 60f + endZ.second / 3600f)
+            .coerceIn((startFrac + 0.25f).coerceAtMost(24f), 24f)
+        // Enough for one line of small text and no more. It used to be 32dp, which is over half an
+        // hour of grid: a quarter-hour event was inflated to twice its length and drawn straight
+        // over whatever started when it ended.
+        val height = (hourHeight * (endFrac - startFrac)).coerceAtLeast(16.dp)
+        out.add(
+            PositionedEvent(
+                event = e,
+                leftFraction = blockLeft,
+                widthFraction = blockRight - blockLeft,
+                depth = depth,
+                topDp = hourHeight * startFrac,
+                heightDp = height,
+            ),
+        )
+        place(
+            group = children[i],
+            sorted = sorted,
+            children = children,
+            left = blockLeft + (blockRight - blockLeft) * NestIndent,
+            right = blockRight,
+            depth = depth + 1,
+            hourHeight = hourHeight,
+            zone = zone,
+            out = out,
+        )
+    }
 }
