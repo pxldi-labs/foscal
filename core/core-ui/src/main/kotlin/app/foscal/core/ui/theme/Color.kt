@@ -2,9 +2,11 @@ package app.foscal.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Cobalt — the design's default accent (drives today, selection, buttons and the FAB).
-val FoscalBlue = Color(0xFF1A73E8)
-val FoscalBlueDark = Color(0xFF8AB4F8)
+// Cobalt — the default accent (drives today, selection, buttons and the FAB).
+// The same blue the launcher icon is built from, so the app a user opens looks like the icon they
+// tapped. Every pair below clears 4.5:1 against what it is drawn on.
+val FoscalBlue = Color(0xFF4355F4)
+val FoscalBlueDark = Color(0xFFAAB2FA)
 
 /**
  * Tokens for one accent preset. The rest of the UI reads only `colorScheme.primary` and the
@@ -22,12 +24,12 @@ data class AccentTokens(
 
 val CobaltAccent = AccentTokens(
     primaryLight = FoscalBlue,
-    primaryContainerLight = Color(0xFFE7F0FF),
-    onPrimaryContainerLight = Color(0xFF0C3B78),
+    primaryContainerLight = Color(0xFFE8EBFE),
+    onPrimaryContainerLight = Color(0xFF19205D),
     primaryDark = FoscalBlueDark,
-    onPrimaryDark = Color(0xFF07121F),
-    primaryContainerDark = Color(0xFF183A66),
-    onPrimaryContainerDark = Color(0xFFD8E7FF),
+    onPrimaryDark = Color(0xFF080A1D),
+    primaryContainerDark = Color(0xFF202975),
+    onPrimaryContainerDark = Color(0xFFE1E4FD),
 )
 
 val VioletAccent = AccentTokens(
