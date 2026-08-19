@@ -53,6 +53,7 @@ import app.foscal.ui.util.timeFormatter
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.math.abs
 import kotlin.math.floor
 
 /**
@@ -70,6 +71,16 @@ val TimelineGutterWidth = 54.dp
  * and the times stay honest and only the paint stops short.
  */
 private val BlockGap = 3.dp
+
+/**
+ * The shortest a block may be drawn, whatever its length says.
+ *
+ * A ten-minute event is four dp on a phone-sized grid, which is not enough to put a word in.
+ */
+private val MinBlockHeight = 16.dp
+
+/** How close the current time has to be to an hour before that hour's label steps aside. */
+private val NowLabelClearance = 16.dp
 val TimelineEndInset = 4.dp
 
 /** Grid hour to open on when no timed event and no "now" marker gives a better anchor. */
@@ -215,14 +226,22 @@ fun TimelineLayout(
                                     .fillMaxWidth(),
                                 contentAlignment = Alignment.TopEnd,
                             ) {
-                                Text(
-                                    // The whole time, not just the hour. "05" beside a grid line
-                                    // is a label you have to decode; "05:00" is one you read.
-                                    "${"%02d".format(h)}:00",
-                                    modifier = Modifier.padding(end = 10.dp),
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                // The hour gives way to the current time when the two would land
+                                // on each other. "12:07" printed over "12:00" is unreadable, and
+                                // of the two the one you already know is the hour.
+                                val eclipsed = showNowLabel &&
+                                    hourHeight * abs(nowFractionalHour - h) < NowLabelClearance
+                                if (!eclipsed) {
+                                    Text(
+                                        // The whole time, not just the hour. "05" beside a grid
+                                        // line is a label you have to decode; "05:00" is one you
+                                        // read.
+                                        "${"%02d".format(h)}:00",
+                                        modifier = Modifier.padding(end = 10.dp),
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
@@ -323,6 +342,20 @@ fun TimelineLayout(
                                 // on the left.
                                 val blockLeft = colWidth * pe.leftFraction + 1.dp
                                 val blockWidth = colWidth * pe.widthFraction - 2.dp
+                                // A block that reaches past its own end stops at the block that
+                                // starts there, instead of running underneath it. Anything that
+                                // overhangs is invisible by definition, and centring a title in a
+                                // box half of which is covered puts the title in the covered half
+                                // — which is what made a ten-minute event unreadable.
+                                val overhangs = pe.visibleDp < pe.heightDp
+                                val drawnHeight = if (overhangs) {
+                                    // Same seam as everywhere else, but with a floor: below about
+                                    // a quarter of an hour there is nothing left to give, and a
+                                    // line you cannot read or tap is worse than a missing seam.
+                                    (pe.visibleDp - BlockGap).coerceAtLeast(10.dp)
+                                } else {
+                                    (pe.heightDp - BlockGap).coerceAtLeast(12.dp)
+                                }
                                 val drag = eventDrag?.takeIf {
                                     it.eventId == pe.event.id &&
                                         it.instanceStartMillis == pe.event.start.toEpochMilli()
@@ -330,7 +363,7 @@ fun TimelineLayout(
                                 EventBlock(
                                     event = pe.event,
                                     zone = zone,
-                                    heightDp = pe.heightDp,
+                                    heightDp = drawnHeight,
                                     compact = compact,
                                     accentStripe = accentStripe,
                                     cornerRadius = blockCornerRadius,
@@ -346,7 +379,7 @@ fun TimelineLayout(
                                         // Without it 08:30-12:00 and 12:00-13:00 render as one
                                         // long shape and the boundary has to be inferred from the
                                         // titles.
-                                        .height((pe.heightDp - BlockGap).coerceAtLeast(12.dp)),
+                                        .height(drawnHeight),
                                     onClick = { onEventClick(pe.event.id, pe.event.start.toEpochMilli()) },
                                     onMove = onEventMove?.let { move ->
                                         { deltaDays, deltaMinutes ->
@@ -590,7 +623,7 @@ private fun EventBlock(
     val textColor = colors.content
     // The same ink, stepped back, so the time reads as secondary without falling off the fill.
     val mutedTextColor = colors.content.copy(alpha = 0.78f)
-    // Too short to stack a title and a time; one line, vertically centred.
+    // Too short to stack a title and anything else: one line, vertically centred.
     val slim = heightDp < 30.dp
     val start = event.start.atZone(zone)
     val end = event.end.atZone(zone)
@@ -683,6 +716,10 @@ private fun EventBlock(
                     fontWeight = FontWeight.Medium,
                     color = textColor,
                     fontSize = 10.sp,
+                    // No leading. A ten-minute event is about ten dp of grid, and the two dp a
+                    // default line height adds above and below the glyphs is the difference
+                    // between a title and a sliced-off title.
+                    lineHeight = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -720,6 +757,17 @@ internal data class PositionedEvent(
     val widthFraction: Float,
     /** 0 for an event nothing contains. Deeper events are drawn later, so they land on top. */
     val depth: Int,
+    /**
+     * The distance to the top of the next block in the same column, where that is less than the
+     * block's own height — in other words, the part of the block that is not about to be painted
+     * over.
+     *
+     * An event too short to hold a line of text is given [MinBlockHeight] anyway, which makes it
+     * reach past its own end and under whatever starts there. Drawn at its full height its title
+     * ends up centred in a box half of which is covered; drawn at this one, the title is centred
+     * in what you can actually see.
+     */
+    val visibleDp: Dp,
     val topDp: Dp,
     val heightDp: Dp,
 )
@@ -804,6 +852,18 @@ private fun place(
         }
     }
     val slot = (right - left) / columnEnds.size
+    val tops = group.associateWith { i ->
+        val startZ = sorted[i].start.atZone(zone)
+        hourHeight * (startZ.hour + startZ.minute / 60f + startZ.second / 3600f).coerceIn(0f, 24f)
+    }
+    // Where the next block in the same column begins — the point past which this one is covered.
+    val ceilings = mutableMapOf<Int, Dp>()
+    val nextTop = mutableMapOf<Int, Dp>()
+    for (i in group.reversed()) {
+        val column = columnOf.getValue(i)
+        ceilings[column]?.let { nextTop[i] = it }
+        ceilings[column] = tops.getValue(i)
+    }
     for (i in group) {
         val e = sorted[i]
         val blockLeft = left + slot * columnOf.getValue(i)
@@ -819,14 +879,17 @@ private fun place(
         // Enough for one line of small text and no more. It used to be 32dp, which is over half an
         // hour of grid: a quarter-hour event was inflated to twice its length and drawn straight
         // over whatever started when it ended.
-        val height = (hourHeight * (endFrac - startFrac)).coerceAtLeast(16.dp)
+        val top = tops.getValue(i)
+        val height = (hourHeight * (endFrac - startFrac)).coerceAtLeast(MinBlockHeight)
+        val visible = nextTop[i]?.let { (it - top).coerceAtLeast(0.dp) } ?: height
         out.add(
             PositionedEvent(
                 event = e,
                 leftFraction = blockLeft,
                 widthFraction = blockRight - blockLeft,
                 depth = depth,
-                topDp = hourHeight * startFrac,
+                visibleDp = minOf(visible, height),
+                topDp = top,
                 heightDp = height,
             ),
         )

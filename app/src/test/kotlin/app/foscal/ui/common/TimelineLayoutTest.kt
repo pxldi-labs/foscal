@@ -148,6 +148,25 @@ class TimelineLayoutTest {
         assertEquals(setOf(0f, 0.5f), positioned.map { it.leftFraction }.toSet())
     }
 
+    /**
+     * A ten-minute event is drawn at the minimum height whatever its length says, so it reaches
+     * past its own end and under the event that starts there. What is reported as visible is the
+     * strip above that event's top edge — the only part its title can safely sit in.
+     */
+    @Test
+    fun aBlockTooShortToDraw_reportsOnlyTheStripThatStaysInView() {
+        val wake = eventAt(5 * 60 + 50, 6 * 60)
+        val gym = eventAt(6 * 60, 7 * 60 + 15)
+
+        val positioned = layoutTimed(listOf(wake, gym), 48.dp, zone)
+
+        val short = positioned.first { it.event.start == wake.start }
+        val long = positioned.first { it.event.start == gym.start }
+        assertEquals("ten minutes of a 48dp hour", 8f, short.visibleDp.value, 0.01f)
+        assertTrue("but it is still drawn tall enough to hold a word", short.heightDp > short.visibleDp)
+        assertEquals("a block nothing covers is visible all the way down", long.heightDp, long.visibleDp)
+    }
+
     /** Back-to-back events are not an overlap: the second gets the full width back. */
     @Test
     fun backToBackEvents_bothKeepTheFullColumn() {
