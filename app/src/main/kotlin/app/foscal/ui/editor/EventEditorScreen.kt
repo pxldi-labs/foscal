@@ -71,6 +71,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -547,9 +549,20 @@ private fun ToggleRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = LocalHapticFeedback.current
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        // Compose's Switch has no haptic of its own, and a toggle is the one control whose entire
+        // output is a state the thumb is sitting on top of.
+        Switch(
+            checked = checked,
+            onCheckedChange = {
+                haptics.performHapticFeedback(
+                    if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff,
+                )
+                onCheckedChange(it)
+            },
+        )
     }
 }
 
@@ -795,7 +808,7 @@ private fun GuestsField(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Guests", style = MaterialTheme.typography.bodyLarge)
+        Text("Attendees", style = MaterialTheme.typography.bodyLarge)
         if (attendees.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 attendees.forEach { attendee ->
@@ -825,7 +838,7 @@ private fun GuestsField(
                 value = draft,
                 onValueChange = onDraftChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Add guest") },
+                label = { Text("Add attendee") },
                 placeholder = { Text("name@example.com") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
@@ -835,7 +848,7 @@ private fun GuestsField(
                 keyboardActions = KeyboardActions(onDone = { onAdd() }),
                 trailingIcon = {
                     IconButton(onClick = onAdd, enabled = canAdd) {
-                        Icon(Icons.Outlined.Add, contentDescription = "Add guest")
+                        Icon(Icons.Outlined.Add, contentDescription = "Add attendee")
                     }
                 },
             )
