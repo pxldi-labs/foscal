@@ -26,8 +26,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -157,7 +159,14 @@ fun TimelineLayout(
     // Open on the part of the day the user cares about. A fixed early-morning offset means that
     // opening the app in the afternoon shows an empty grid with the next event scrolled off below.
     val anchorHour = anchorHour(timedDays, today, now, zone)
+    // Which anchor has already been applied, saved rather than merely remembered. Opening an event
+    // takes the grid out of composition, and a plain `remember` would forget on the way back and
+    // re-anchor — throwing away the position the user had scrolled to, which `scrollState` itself
+    // restores perfectly well.
+    var anchoredAt by rememberSaveable { mutableIntStateOf(Int.MIN_VALUE) }
     LaunchedEffect(anchorHour) {
+        if (anchoredAt == anchorHour) return@LaunchedEffect
+        anchoredAt = anchorHour
         val targetPx = with(density) { (hourHeight * anchorHour).toPx() }.toInt()
         scrollState.scrollTo(targetPx.coerceAtLeast(0))
     }

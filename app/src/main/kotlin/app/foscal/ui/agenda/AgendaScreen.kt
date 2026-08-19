@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -82,7 +83,10 @@ fun AgendaRoute(
     viewModel: AgendaViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var positionedAtToday by remember { mutableStateOf(false) }
+    // Saved rather than merely remembered: opening an event takes the agenda out of composition,
+    // and a plain `remember` would forget it had already parked and snap the list back to today,
+    // throwing away the position `listState` itself restores perfectly well.
+    var positionedAtToday by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.items, headerHeightPx) {
         if (!positionedAtToday && state.todayIndex >= 0 && headerHeightPx > 0) {
