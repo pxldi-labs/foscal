@@ -74,6 +74,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 /**
  * Width of the hour-label gutter and the inset at the far edge of the grid. Any header rendered
@@ -185,6 +186,11 @@ fun TimelineLayout(
     onEventMove: ((event: Event, newStartMillis: Long, newEndMillis: Long) -> Unit)? = null,
     /** How long a block placed by a tap — or by a long press that never moved — comes out. */
     newEventMinutes: Int = 60,
+    /**
+     * Bumped by the caller when a move it was handed is not going to happen after all, so the
+     * block being held at the dropped position can go back where it came from.
+     */
+    revertMoveSignal: Int = 0,
 ) {
     val scrollState = rememberScrollState()
     val density = LocalDensity.current
@@ -237,6 +243,22 @@ fun TimelineLayout(
     // asking the user to move their hand out of the way first.
     val haptics = LocalHapticFeedback.current
     var eventDrag by remember { mutableStateOf<EventDrag?>(null) }
+    // The preview outlives the finger. A dropped event is written to the provider and comes back
+    // through a flow, which takes a few frames; releasing the preview on lift put the block back
+    // where it started for exactly that long, so every successful move read as a jump backwards
+    // followed by a jump forwards. Now the block simply stays where it was dropped and the new
+    // data replaces it in place.
+    LaunchedEffect(days) { if (eventDrag?.committed == true) eventDrag = null }
+    // A move that was offered and turned down (the recurring "which of these?" dialog, dismissed)
+    // never reaches the provider, so no new data is coming to release the block.
+    LaunchedEffect(revertMoveSignal) { if (revertMoveSignal > 0) eventDrag = null }
+    // And a write the provider refuses outright emits nothing either. Rare, but a block stranded
+    // where it is not is worse than one that snaps back a moment late.
+    LaunchedEffect(eventDrag?.committed) {
+        if (eventDrag?.committed != true) return@LaunchedEffect
+        delay(4_000)
+        eventDrag = null
+    }
     // What is pending on the grid right now, as a day and a range of minutes: a drag in progress
     // beats a parked block, since the finger is on the first one.
     val pending: Pair<LocalDate, IntRangeLike>? = selection?.let { it.date to it.span(newEventMinutes) }
@@ -501,7 +523,13 @@ fun TimelineLayout(
                                     } else {
                                         null
                                     },
-                                    onMovePreviewEnd = { eventDrag = null },
+                                    onMovePreviewEnd = { committed ->
+                                        eventDrag = if (committed) {
+                                            eventDrag?.copy(committed = true)
+                                        } else {
+                                            null
+                                        }
+                                    },
                                     dayIndex = dayIndex,
                                     visibleDayCount = timedDays.size,
                                     eventLeftInDay = blockLeft,
@@ -742,6 +770,8 @@ private data class EventDrag(
     val instanceStartMillis: Long,
     val deltaDays: Int,
     val deltaMinutes: Int,
+    /** Whether the finger has let go and the move has been handed on to be written. */
+    val committed: Boolean = false,
 )
 
 internal fun Int.roundToStep(step: Int): Int {
@@ -874,7 +904,7 @@ private fun EventBlock(
     onClick: () -> Unit,
     onMove: ((deltaDays: Int, deltaMinutes: Int) -> Unit)? = null,
     onMovePreview: ((deltaDays: Int, deltaMinutes: Int) -> Unit)? = null,
-    onMovePreviewEnd: () -> Unit = {},
+    onMovePreviewEnd: (committed: Boolean) -> Unit = {},
     dayIndex: Int = 0,
     visibleDayCount: Int = 1,
     eventLeftInDay: Dp = 0.dp,
@@ -967,19 +997,22 @@ private fun EventBlock(
                             onDragCancel = {
                                 totalDrag = Offset.Zero
                                 lastDelta = 0 to 0
-                                onMovePreviewEnd()
+                                onMovePreviewEnd(false)
                             },
                             onDragEnd = {
                                 val (deltaDays, deltaMinutes) = deltas()
                                 totalDrag = Offset.Zero
                                 lastDelta = 0 to 0
-                                onMovePreviewEnd()
-                                if (deltaDays != 0 || deltaMinutes != 0) {
+                                val moved = deltaDays != 0 || deltaMinutes != 0
+                                // Handed on *before* the preview is released, so whoever takes it
+                                // can hold the block where it was dropped.
+                                if (moved) {
                                     onMove(deltaDays, deltaMinutes)
                                     // Only when it landed somewhere new. Dropping an event back
                                     // where it started changed nothing and should not claim to.
                                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                                 }
+                                onMovePreviewEnd(moved)
                             },
                         )
                     }

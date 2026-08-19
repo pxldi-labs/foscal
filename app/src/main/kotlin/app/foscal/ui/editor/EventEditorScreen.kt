@@ -91,6 +91,7 @@ import app.foscal.core.model.Frequency
 import app.foscal.core.model.ReminderDuration
 import app.foscal.core.ui.theme.Motion
 import app.foscal.ui.CalendarColors
+import app.foscal.ui.common.RecurrenceScopeDialog
 import app.foscal.ui.common.ReminderDurationDialog
 import app.foscal.ui.contrastColor
 import app.foscal.ui.util.LocalUse24HourClock
@@ -129,7 +130,7 @@ fun EventEditorRoute(
 
     state.scopePrompt?.let { prompt ->
         RecurrenceScopeDialog(
-            prompt = prompt,
+            verb = if (prompt == RecurrenceScopePrompt.DELETE) "Delete" else "Change",
             onScope = viewModel::resolveScope,
             onDismiss = viewModel::dismissScopePrompt,
         )
@@ -481,44 +482,6 @@ private fun EditorForm(
         }
         Spacer(Modifier.height(48.dp))
     }
-}
-
-@Composable
-private fun RecurrenceScopeDialog(
-    prompt: RecurrenceScopePrompt,
-    onScope: (RecurrenceScope) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val verb = if (prompt == RecurrenceScopePrompt.DELETE) "Delete" else "Change"
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("$verb recurring event") },
-        text = {
-            Column {
-                Text("This event repeats. Apply your change to:")
-                Spacer(Modifier.height(16.dp))
-                ScopeChoice("$verb this event") { onScope(RecurrenceScope.SINGLE) }
-                ScopeChoice("$verb this and following events") { onScope(RecurrenceScope.THIS_AND_FOLLOWING) }
-                ScopeChoice("$verb all events") { onScope(RecurrenceScope.ALL_EVENTS) }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
-}
-
-@Composable
-private fun ScopeChoice(label: String, onClick: () -> Unit) {
-    Text(
-        label,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.primary,
-    )
 }
 
 @Composable
