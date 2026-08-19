@@ -4,9 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -319,16 +321,34 @@ private fun EditorForm(
                     title = "Repeats",
                     selected = state.frequency,
                 ) { freq -> viewModel.updateFrequency(freq) }
-                if (state.frequency != Frequency.NONE) {
-                    TextButton(onClick = viewModel::toggleCustomRecurrence) {
-                        Text(if (state.showCustomRecurrence) "Hide options" else "Customize…")
-                    }
-                    if (state.showCustomRecurrence) {
-                        CustomRecurrenceControls(
-                            state = state,
-                            viewModel = viewModel,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
+                // Grown into rather than popped in. Choosing "Weekly" adds a button and, behind
+                // it, a whole panel of controls; appearing instantly made the rest of the form
+                // jump down the screen with nothing to say it had. The all-day row next to it
+                // already opens its time fields this way.
+                AnimatedVisibility(
+                    visible = state.frequency != Frequency.NONE,
+                    enter = expandVertically(tween(Motion.DurationMedium)) +
+                        fadeIn(tween(Motion.DurationMedium)),
+                    exit = shrinkVertically(tween(Motion.DurationMedium)) +
+                        fadeOut(tween(Motion.DurationMedium)),
+                ) {
+                    Column {
+                        TextButton(onClick = viewModel::toggleCustomRecurrence) {
+                            Text(if (state.showCustomRecurrence) "Hide options" else "Customize…")
+                        }
+                        AnimatedVisibility(
+                            visible = state.showCustomRecurrence,
+                            enter = expandVertically(tween(Motion.DurationMedium)) +
+                                fadeIn(tween(Motion.DurationMedium)),
+                            exit = shrinkVertically(tween(Motion.DurationMedium)) +
+                                fadeOut(tween(Motion.DurationMedium)),
+                        ) {
+                            CustomRecurrenceControls(
+                                state = state,
+                                viewModel = viewModel,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                     }
                 }
             }

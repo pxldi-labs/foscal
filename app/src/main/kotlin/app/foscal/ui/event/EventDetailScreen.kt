@@ -469,7 +469,7 @@ private fun ReplyRow(
         // Only when the write was refused. The chips do not move optimistically, so a reply that
         // worked needs no confirmation — but one that did not looks identical to one nobody
         // tapped, and a read-only calendar is not something the user can be expected to infer.
-        if (failed) {
+        AnimatedVisibility(visible = failed) {
             Text(
                 "Your answer could not be saved. This calendar may be read-only.",
                 style = MaterialTheme.typography.labelSmall,

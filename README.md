@@ -85,7 +85,9 @@ CalDAV-compatible server (Nextcloud, ownCloud, Radicale, Baïkal, …) via
 - **Quick add** — type a natural phrase ("Dentist friday 9:30am", "Lunch
   tomorrow noon", "PTO all-day") and it parses the title, date, and time.
 - **Import & export `.ics`** — export every event on your visible calendars to a
-  standard iCalendar file, or import one into a calendar you pick. Recurrence
+  standard iCalendar file — choosing which calendars go into it, with each one's
+  event count next to it — or import one into a calendar you pick, or into a new
+  one made without leaving the dialog. Recurrence
   rules, all-day spans, time zones, reminders and multi-line notes are carried
   across, and so are attendees (`ORGANIZER` / `ATTENDEE` with their `PARTSTAT`), and so
   are per-occurrence changes to a repeating event: a moved

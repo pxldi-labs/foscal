@@ -152,6 +152,8 @@ pill above the block naming the range), tap-to-park-then-tap-to-open for a
 default-length event, and long-press drag-to-move for timed events; recurring timed
 moves are stored as single occurrence exceptions. How events are *drawn* — colour
 strength, title size, whether titles wrap — is the "Calendar style" settings page.
+Export asks which calendars to write (checkboxes, with each one's event count) and
+import can make the calendar it is about to import into without leaving the dialog.
 The event detail screen carries no app bar: back floats top-left over the header
 gradient, and edit plus an overflow (Duplicate, Delete) float top-right. Duplicate
 goes through `Routes.editorCopy`, whose `copyFrom` argument makes the editor read an
@@ -432,6 +434,24 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   but the mail an Exchange/Outlook account sends on the back of it goes out on that adapter's next
   sync, which can be an hour later; and there is no way to answer *without* it, because
   `CalendarContract` carries only the status and every decision after that belongs to the adapter.
+- **A drag-to-move must be told how much of a series it means, and must carry the event's own
+  colour.** `moveEvent` builds a fresh `EventInput`, and every field it leaves out is a field it
+  *clears*: `color` defaults to null and null means "put this event back on its calendar's colour",
+  so a drag used to strip it. Read it with `getEventColor` — never pass `Event.color`, which is the
+  resolved `DISPLAY_COLOR` and already falls back to the calendar's. Scope is the other half: a
+  drop on an occurrence is offered the same three choices as an edit or a delete, and "all events"
+  shifts the *master's* DTSTART by the delta rather than setting it to the dropped time, which for
+  any occurrence past the first would jump the series forward by however many repeats have run.
+- **The grid holds a move preview past the drop.** The write goes to the provider and returns
+  through a flow; releasing the preview when the finger lifts put the block back at its old time
+  for those frames, so a successful move read as a jump backwards and then forwards. `EventDrag`
+  now carries a `committed` flag and is released by new data arriving, by `revertMoveSignal` (the
+  scope dialog dismissed), or by a timeout if the write is refused and neither happens.
+- **`launch()` on an `ActivityResultLauncher` can throw.** `CREATE_DOCUMENT` and `OPEN_DOCUMENT`
+  need a documents provider, and stripped ROMs, some work profiles and the ATD emulator images do
+  not ship one — the `ActivityNotFoundException` comes out of a click handler and takes the app
+  down. Both transfer pickers go through `launchSafely`. The same rule is why `openLink`/`openMail`
+  wrap `startActivity`.
 - **Haptics answer for the part of the screen the hand is covering, and nothing else.** The rule is
   not "confirm every tap" — a tap on a visible control confirms itself, and a buzz on top is noise
   that trains people to ignore the ones that matter. Feedback is added exactly where the result is
