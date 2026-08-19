@@ -539,7 +539,7 @@ private fun AccentCard(
                     modifier = Modifier.size(28.dp),
                 )
                 Text(
-                    "Accent color",
+                    "Accent colour",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
