@@ -327,11 +327,30 @@ private fun WelcomeStep(onStart: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(96.dp))
+        Spacer(Modifier.height(72.dp))
         FoscalMark(Modifier.size(104.dp))
         Spacer(Modifier.height(30.dp))
         FoscalWordmark()
-        Spacer(Modifier.height(154.dp))
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "A Material Design 3 open source calendar",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(40.dp))
+        // Three facts, not a pitch. Each one is something the app either does or does not do, and
+        // a first screen is the only place a calendar gets to say "nothing leaves this phone"
+        // before the user has to take that on trust.
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            WelcomePoint("No account, no network, no tracking.")
+            WelcomePoint("Syncs with Nextcloud, ownCloud and any CalDAV server through DAVx⁵.")
+            WelcomePoint("Day, week, month and agenda views.")
+        }
+        Spacer(Modifier.height(52.dp))
         Button(
             onClick = onStart,
             modifier = Modifier
@@ -341,6 +360,29 @@ private fun WelcomeStep(onStart: () -> Unit) {
         ) {
             Text("Get started", fontWeight = FontWeight.SemiBold)
         }
+    }
+}
+
+/** One line of the welcome list, with a dot rather than a bullet glyph the font may not have. */
+@Composable
+private fun WelcomePoint(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .size(5.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.primary),
+        )
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -383,11 +425,11 @@ private fun CalendarSetupStep(
             icon = Icons.Outlined.CloudSync,
             title = "Sync with CalDAV",
             subtitle = if (state.davxStatus == DAVxStatus.INSTALLED) {
-                "Nextcloud, ownCloud and the rest, through DAVx5."
+                "Nextcloud, ownCloud and the rest, through DAVx⁵."
             } else {
-                "Needs DAVx5, free on F-Droid."
+                "Needs DAVx⁵, free on F-Droid."
             },
-            buttonText = if (state.davxStatus == DAVxStatus.INSTALLED) "Open DAVx5" else "Install DAVx5",
+            buttonText = if (state.davxStatus == DAVxStatus.INSTALLED) "Open DAVx⁵" else "Install DAVx⁵",
             enabled = !state.completing,
             onClick = onUseDavx,
         )

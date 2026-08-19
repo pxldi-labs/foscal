@@ -57,7 +57,7 @@ fun CalendarStyleSettings(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         StylePreview(modifier = Modifier.padding(horizontal = 12.dp))
 
-        StyleHeader("Event colours")
+        StyleHeader("Colours")
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -74,7 +74,7 @@ fun CalendarStyleSettings(
             }
         }
 
-        StyleHeader("Event title size")
+        StyleHeader("Title size")
         TextScaleSlider(
             percent = state.textScalePercent,
             onPercent = viewModel::setTextScalePercent,

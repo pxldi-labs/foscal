@@ -284,13 +284,6 @@ private fun DetailContent(
 }
 
 /**
- * The guest list, organizer first, with each person's answer.
- *
- * Tapping a row opens a mail composer — Foscal has no way to send or answer an invitation itself
- * (that is the sync adapter's and the server's job), so passing the address to whatever mail app the
- * user already has is the honest affordance rather than a Yes/No pair that would go nowhere.
- */
-/**
  * Yes / Maybe / No for an invitation.
  *
  * Three buttons rather than a menu because the answer is the reason the screen was opened, and a
@@ -325,6 +318,14 @@ private fun ReplyRow(current: AttendeeStatus, onReply: (AttendeeStatus) -> Unit)
     }
 }
 
+/**
+ * The guest list, organizer first, with each person's answer.
+ *
+ * Tapping a row opens a mail composer. Answering for *yourself* is a write to your own attendee
+ * row that the sync adapter delivers, which is what [ReplyRow] does; there is no equivalent for
+ * anybody else, so handing their address to whatever mail app the user already has is the only
+ * honest thing on offer here.
+ */
 @Composable
 private fun GuestsCard(attendees: List<Attendee>, onEmail: (String) -> Unit) {
     Card(

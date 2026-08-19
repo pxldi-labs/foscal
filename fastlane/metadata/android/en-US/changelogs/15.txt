@@ -1,8 +1,12 @@
 0.13.0
 
-* Guests: see who is on an event, and reply Yes, Maybe or No to an invitation.
-* A join button for a video call linked in an event's notes or location.
-* Give an event a colour of its own, or leave it on its calendar's.
-* Keep a calendar out of the month grid while it still shows everywhere else.
-* Skip short events in the month grid.
+* A week grid you can read: an event booked inside another is nested rather
+  than squeezed into half a column.
+* Drag the grid to draw a new event, or tap it for an hour.
+* Guests: see who is on an event, and reply Yes, Maybe or No.
+* A join button for a video call linked in an event.
+* Give an event a colour of its own.
+* Calendar style settings: colours, title size, wrapping.
+* Skip short events, or a calendar, in the month grid.
 * Snooze a reminder from its notification.
+* A new icon.

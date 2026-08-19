@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,12 +71,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.BuildConfig
+import app.foscal.R
 import app.foscal.core.model.Calendar
 import app.foscal.core.model.Ics
 import app.foscal.core.model.ReminderDuration
@@ -144,26 +147,34 @@ fun SettingsScreen(
         ) {
             when (section) {
                 null -> settingsIndex(onOpenSection)
-                SettingsSection.Appearance -> appearanceSection(state, viewModel)
-                SettingsSection.CalendarStyle -> item {
-                    CalendarStyleSettings(state = eventStyle, viewModel = eventStyleViewModel)
+                SettingsSection.Appearance -> {
+                    item { SectionHeader("The app") }
+                    appearanceSection(state, viewModel)
+                    item { SectionHeader("Events on the grid") }
+                    item {
+                        CalendarStyleSettings(state = eventStyle, viewModel = eventStyleViewModel)
+                    }
                 }
-                SettingsSection.CalendarView -> item {
-                    CalendarViewSettings(
-                        state = behaviour,
-                        viewModel = behaviourViewModel,
-                        use24HourClock = state.use24HourClock,
-                        onUse24HourClock = viewModel::setUse24HourClock,
-                    )
-                }
-                SettingsSection.NewEvents -> item {
-                    NewEventSettings(
-                        state = behaviour,
-                        viewModel = behaviourViewModel,
-                        calendars = state.items,
-                        mapsEnabled = state.osmMapsEnabled,
-                        onMapsEnabled = viewModel::setOsmMapsEnabled,
-                    )
+                SettingsSection.Behaviour -> {
+                    item { SectionHeader("The calendar") }
+                    item {
+                        CalendarViewSettings(
+                            state = behaviour,
+                            viewModel = behaviourViewModel,
+                            use24HourClock = state.use24HourClock,
+                            onUse24HourClock = viewModel::setUse24HourClock,
+                        )
+                    }
+                    item { SectionHeader("New events") }
+                    item {
+                        NewEventSettings(
+                            state = behaviour,
+                            viewModel = behaviourViewModel,
+                            calendars = state.items,
+                            mapsEnabled = state.osmMapsEnabled,
+                            onMapsEnabled = viewModel::setOsmMapsEnabled,
+                        )
+                    }
                 }
                 SettingsSection.Calendars -> calendarsSection(
                     state = state,
@@ -246,14 +257,11 @@ private fun SectionRow(section: SettingsSection, onClick: () -> Unit) {
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(section.title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                section.summary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            section.title,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
@@ -397,9 +405,19 @@ private fun AboutSection() {
         modifier = Modifier.padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        // The mark, at the size a launcher icon actually is. About is the one page in the app
+        // that is about the app rather than about the calendar, and a version number on its own
+        // reads like a diagnostic.
+        Image(
+            painter = painterResource(R.drawable.ic_foscal_badge),
+            contentDescription = null,
+            modifier = Modifier
+                .padding(bottom = 6.dp)
+                .size(64.dp),
+        )
         Text("Foscal ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
         Text(
-            "Foscal doesn't sync by itself. DAVx\u2085 or your account app keeps calendars current.",
+            "Foscal doesn't sync by itself. DAVx\u2075 or your account app keeps calendars current.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

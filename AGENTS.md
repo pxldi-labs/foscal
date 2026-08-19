@@ -416,9 +416,12 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   reader drops the duplicate row rather than showing the same person twice. The editor will not let
   the organizer be removed: dropping that row un-invites nobody, it only loses which address the
   invitation came from.
-- **Foscal sends no invitations.** It writes guests to the provider and the calendar's sync adapter
-  delivers them. There is deliberately no Yes/No affordance on the detail screen — tapping a guest
-  opens a `mailto:` intent, which is the only thing the app can honestly do.
+- **Foscal sends no invitations, but it can answer one.** It writes guests to the provider and the
+  calendar's sync adapter delivers them; the app never mails anybody itself. Replying is the same
+  shape in reverse — `setSelfAttendeeStatus` writes `ATTENDEE_STATUS` on the user's *own* row and
+  the adapter carries it back — which is why the detail screen offers Yes / Maybe / No when the
+  user is an attendee. There is no equivalent for anybody else on the list, so tapping another
+  guest opens a `mailto:` intent, which remains the only thing the app can honestly do about them.
 - **The editor only offers the guest field for events the user organized**
   (`EditorUiState.canEditGuests`). Rewriting the `ATTENDEE` rows of somebody else's event is not an
   edit but a scheduling message, and CalDAV servers vary in what they do with one — up to mailing
