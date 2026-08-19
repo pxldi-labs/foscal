@@ -73,8 +73,11 @@ class MonthViewModel @Inject constructor(
      * as-is, so keeping the same instance across a page turn is what stops both the outgoing and
      * incoming grids rebuilding in the middle of the slide.
      */
-    private val eventsByDay = events.map { evts ->
+    private val eventsByDay = combine(events, prefs.monthMinimumMinutes) { evts, minimum ->
         evts
+            // All-day events are never dropped: being all day is exactly what makes them worth a
+            // month cell, and they have no length to compare in the first place.
+            .filter { it.allDay || minimum <= 0 || it.durationMillis >= minimum * 60_000L }
             .flatMap { e -> e.spannedDays(zone).map { d -> d to e } }
             .groupBy({ it.first }, { it.second })
     }

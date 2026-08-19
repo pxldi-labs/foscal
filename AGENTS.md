@@ -179,6 +179,10 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   with the rest of the UI whenever the user has forced Light or Dark in Settings. The only
   legitimate callers of `isSystemInDarkTheme()` are `MainActivity`, where `ThemeMode.SYSTEM`
   is resolved into the `darkTheme` argument, and that parameter's own default.
+- **Event colour** — `Instances.DISPLAY_COLOR` already resolves to the event's own colour when it
+  has one and the calendar's otherwise, so reading needs nothing special; only the write is the
+  app's problem. `EventInput.color` of null must write `putNull(EVENT_COLOR)`, never omit the
+  column, or an event put back on its calendar's colour silently keeps the old one.
 - **Which calendars a view draws** — `visibleCalendarIds(repository, prefs)` in
   `ui/util/VisibleCalendars.kt` is the one source, intersecting the provider's `Calendars.VISIBLE`
   with the user's own toggle. Month uses `monthCalendarIds`, which layers a second, month-only

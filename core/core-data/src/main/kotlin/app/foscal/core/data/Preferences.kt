@@ -23,6 +23,15 @@ interface Preferences {
      * blocks that say nothing at that size and crowd out the appointments that do.
      */
     val monthHiddenCalendarIds: Flow<Set<String>>
+
+    /**
+     * Events shorter than this many minutes are left out of the month grid. 0 means show all.
+     *
+     * The blunt companion to [monthHiddenCalendarIds]: that one thins the grid by calendar, this
+     * one by weight, without needing a decision per calendar. All-day events are never hidden by
+     * it — length is exactly what makes them worth seeing at that size.
+     */
+    val monthMinimumMinutes: Flow<Int>
     /**
      * Minutes before start to pre-fill on a new event, or null when the user picked "None".
      *
@@ -100,6 +109,8 @@ interface Preferences {
     suspend fun setHiddenCalendars(ids: Set<String>)
 
     suspend fun setMonthHiddenCalendars(ids: Set<String>)
+
+    suspend fun setMonthMinimumMinutes(minutes: Int)
     suspend fun setDefaultReminder(minutes: Int?)
 
     /** Overrides the default for one calendar; [minutes] of null means "None on this calendar". */
