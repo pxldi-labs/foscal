@@ -198,9 +198,11 @@ fun TimelineLayout(
                                 contentAlignment = Alignment.TopEnd,
                             ) {
                                 Text(
-                                    "${"%02d".format(h)}",
-                                    modifier = Modifier.padding(end = 8.dp),
-                                    fontSize = 10.sp,
+                                    // The whole time, not just the hour. "05" beside a grid line
+                                    // is a label you have to decode; "05:00" is one you read.
+                                    "${"%02d".format(h)}:00",
+                                    modifier = Modifier.padding(end = 10.dp),
+                                    fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -382,15 +384,14 @@ fun TimelineLayout(
                             .offset(y = hourHeight * nowFractionalHour - 8.dp),
                         contentAlignment = Alignment.CenterEnd,
                     ) {
+                        // Coloured text, not a filled chip. The chip was the loudest thing on a
+                        // screen whose whole job is the events, and it was shouting the one fact
+                        // the user can also read off the clock in their status bar.
                         Text(
                             nowZ.format(nowLabelFmt),
-                            modifier = Modifier
-                                .padding(end = 5.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(nowColor)
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
-                            color = Color.White,
-                            fontSize = 9.sp,
+                            modifier = Modifier.padding(end = 10.dp),
+                            color = nowColor,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -512,24 +513,18 @@ internal fun assignAllDayLanes(spans: List<AllDaySpan>): List<List<AllDaySpan>> 
 
 @Composable
 private fun AllDayBar(event: Event, modifier: Modifier, onClick: () -> Unit) {
-    // Tinted with a stripe, exactly like a timed block. It used to be a solid slab of the raw
-    // calendar colour, which put the two things ten times apart in weight for no reason anyone
-    // looking at them could work out — an all-day event is not ten times more important than a
-    // meeting. Being small is what earns it the extra emphasis, and the stripe carries that.
+    // The same solid fill a timed block gets, from the same helper, so the two cannot drift apart
+    // again — which is exactly what had happened: a solid slab up here and a ten-percent wash down
+    // there, for two things that are the same kind of object.
     val colors = eventColors(event.color)
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(5.dp))
             .background(colors.container)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .width(2.5.dp)
-                .fillMaxHeight()
-                .background(colors.accent),
-        )
         Text(
             event.title,
             style = MaterialTheme.typography.labelSmall,
@@ -537,7 +532,6 @@ private fun AllDayBar(event: Event, modifier: Modifier, onClick: () -> Unit) {
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 6.dp),
         )
     }
 }
@@ -562,22 +556,23 @@ private fun EventBlock(
     hourHeight: Dp = 60.dp,
 ) {
     val colors = eventColors(event.color)
-    val baseColor = colors.accent
     val textColor = colors.content
-    // The same hue, stepped back, so the time reads as secondary without falling out of the block.
-    val mutedTextColor = colors.content.copy(alpha = 0.75f)
+    // The same ink, stepped back, so the time reads as secondary without falling off the fill.
+    val mutedTextColor = colors.content.copy(alpha = 0.78f)
+    // Too short to stack a title and a time; one line, vertically centred.
+    val slim = heightDp < 30.dp
     val start = event.start.atZone(zone)
     val end = event.end.atZone(zone)
     val is24Hour = LocalUse24HourClock.current
     val locale = currentLocale()
     val timeFmt = remember(is24Hour, locale) { timeFormatter(is24Hour, locale) }
-    val showTime = !compact && heightDp >= 36.dp
-    val textPadding = if (compact) {
+    val showTime = !compact && heightDp >= 40.dp
+    val textPadding = when {
+        slim -> Modifier.fillMaxSize().padding(horizontal = if (compact) 3.dp else 8.dp)
         // Week columns are only ~48dp wide on a phone. Every dp of padding here costs a character,
         // and once a word no longer fits the line the layout breaks it mid-word ("plannin/g").
-        Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 2.dp)
-    } else {
-        Modifier.fillMaxSize().padding(start = 10.dp, end = 6.dp, top = 5.dp, bottom = 5.dp)
+        compact -> Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 2.dp)
+        else -> Modifier.fillMaxSize().padding(start = 10.dp, end = 8.dp, top = 6.dp, bottom = 5.dp)
     }
     val titleScale = if (compact) 10.sp else 13.sp
     val detailScale = if (compact) 10.sp else 11.sp
@@ -632,31 +627,41 @@ private fun EventBlock(
             )
             .clickable(onClick = onClick),
     ) {
-        // A stripe everywhere, not only in the wide views. A week column used to get the tint and
-        // nothing else, which is what made those blocks look washed out next to an all-day bar.
-        Box(
-            Modifier
-                .width(if (accentStripe) 3.dp else 2.5.dp)
-                .fillMaxHeight()
-                .background(baseColor),
-        )
-        Column(textPadding) {
-            Text(
-                event.title,
-                fontWeight = FontWeight.SemiBold,
-                color = textColor,
-                fontSize = titleScale,
-                maxLines = maxTitleLines,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (showTime) {
+        // No stripe: the fill is the colour now, and a stripe of the same colour on top of it is
+        // just a seam. It existed to give a 10%-tinted block something to be identified by.
+        if (slim) {
+            // A quarter-hour slot is about fifteen dp. There is room for one line of the title and
+            // nothing else, and trying to fit more is what used to make these overlap the event
+            // below them.
+            Box(textPadding, contentAlignment = Alignment.CenterStart) {
                 Text(
-                    "${start.toLocalTime().format(timeFmt)} – ${end.toLocalTime().format(timeFmt)}",
-                    color = mutedTextColor,
-                    fontSize = detailScale,
+                    event.title,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor,
+                    fontSize = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+        } else {
+            Column(textPadding) {
+                Text(
+                    event.title,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor,
+                    fontSize = titleScale,
+                    maxLines = maxTitleLines,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (showTime) {
+                    Text(
+                        "${start.toLocalTime().format(timeFmt)} – ${end.toLocalTime().format(timeFmt)}",
+                        color = mutedTextColor,
+                        fontSize = detailScale,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -718,7 +723,10 @@ internal fun layoutTimed(
             val endFrac = (endZ.hour + endZ.minute / 60f + endZ.second / 3600f)
                 .coerceIn((startFrac + 0.25f).coerceAtMost(24f), 24f)
             val top = hourHeight * startFrac
-            val height = (hourHeight * (endFrac - startFrac)).coerceAtLeast(32.dp)
+            // Enough for one line of small text and no more. It used to be 32dp, which is over
+            // half an hour of grid: a quarter-hour event was inflated to twice its length and
+            // drawn straight over whatever started when it ended.
+            val height = (hourHeight * (endFrac - startFrac)).coerceAtLeast(16.dp)
             out.add(PositionedEvent(e, col, totalCols, top, height))
         }
     }

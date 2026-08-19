@@ -10,25 +10,24 @@ import app.foscal.core.ui.theme.LocalIsDarkTheme
 
 /** The two colours an event is drawn in, derived once from its calendar's colour. */
 data class EventColors(
-    /** The block's fill: the event's colour, blended down into the surface behind it. */
+    /** The block's fill: the event's colour, at full strength. */
     val container: Color,
-    /** Its text, and anything else that has to be read against [container]. */
+    /** Its text, black or white — whichever actually reads on [container]. */
     val content: Color,
-    /** The event's colour at full strength, for the stripe that identifies it. */
+    /** The event's colour untouched, for anything that needs the source rather than the fill. */
     val accent: Color,
 )
 
 /**
  * How an event should be painted, given its calendar's colour.
  *
- * Blended into the surface rather than drawn at an alpha, because alpha does not survive both
- * themes: ten percent of a colour over near-black is invisible, and the same ten percent over
- * white washes out to nothing. Blending keeps the hue at a usable weight either way.
+ * Solid. A tinted block has to be pale enough for dark text to sit on it, which means the colour
+ * stops carrying any weight of its own — a screen of them reads as grey boxes with a hint of hue,
+ * and telling one calendar from another takes a deliberate look rather than a glance. Filling with
+ * the colour and choosing text to suit puts the readability back where it belongs.
  *
- * The text is taken from the event's own hue rather than plain `onSurface`, so a block reads as
- * belonging to its calendar instead of as grey text on a faint tint — and it is pushed toward
- * black or white until it actually clears 4.5:1 against the container it sits on, because a
- * calendar's colour is whatever the user or their server chose and some of those are pale yellow.
+ * Dark theme pulls the fill toward the surface. The same saturated colour that reads as confident
+ * on white glares on near-black, and a wall of them is exhausting.
  */
 @Composable
 fun eventColors(eventColorArgb: Int): EventColors {
@@ -36,24 +35,45 @@ fun eventColors(eventColorArgb: Int): EventColors {
     val surface = MaterialTheme.colorScheme.surface
     return remember(eventColorArgb, dark, surface) {
         val accent = Color(eventColorArgb)
-        val container = lerp(surface, accent, if (dark) 0.28f else 0.20f)
-        EventColors(
-            container = container,
-            content = readableOn(container, accent, toward = if (dark) Color.White else Color.Black),
-            accent = accent,
-        )
+        val base = if (dark) lerp(accent, surface, 0.30f) else accent
+        val ink = readableOn(base)
+        EventColors(container = legible(base, ink), content = ink, accent = accent)
     }
 }
 
-/** [color] pushed [toward] black or white in small steps until it clears 4.5:1 against [on]. */
-private fun readableOn(on: Color, color: Color, toward: Color): Color {
-    var candidate = color
+/**
+ * [fill] nudged away from [ink] until the two clear 4.5:1.
+ *
+ * Mid-luminance colours — an orange, a teal, a red — sit almost equidistant from black and white,
+ * and land near 4.2:1 against whichever is closer. Three of the app's own eight presets did. The
+ * shift needed is 3–4% and is not perceptible; the cap is there for a colour where no amount of
+ * it would help, which is better than looping toward grey.
+ */
+private fun legible(fill: Color, ink: Color): Color {
+    val away = if (ink == Color.White) Color.Black else Color.White
     var step = 0
-    while (contrastRatio(on, candidate) < 4.5f && step < 20) {
+    var candidate = fill
+    while (contrastRatio(candidate, ink) < 4.5f && step < 30) {
         step++
-        candidate = lerp(color, toward, step * 0.05f)
+        candidate = lerp(fill, away, step * 0.01f)
     }
     return candidate
+}
+
+/**
+ * Black or white on [background], whichever has the better ratio.
+ *
+ * Not a luminance threshold: a mid-tone teal sits either side of one depending where it is drawn,
+ * and picking the wrong side there costs more contrast than the threshold ever saves. Near-black
+ * rather than black, which is less of a hole in a saturated fill.
+ */
+private fun readableOn(background: Color): Color {
+    val ink = Color(0xFF16181B)
+    return if (contrastRatio(background, ink) >= contrastRatio(background, Color.White)) {
+        ink
+    } else {
+        Color.White
+    }
 }
 
 private fun contrastRatio(a: Color, b: Color): Float {

@@ -183,6 +183,12 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   has one and the calendar's otherwise, so reading needs nothing special; only the write is the
   app's problem. `EventInput.color` of null must write `putNull(EVENT_COLOR)`, never omit the
   column, or an event put back on its calendar's colour silently keeps the old one.
+- **Event blocks** — one helper, `ui/EventColors.kt`, decides the fill and the text for both the
+  timed blocks and the all-day bars, so the two cannot drift apart the way they had (a solid slab
+  up top, a 10% wash below). The fill is the calendar's colour; the text is black or white by
+  whichever actually measures better, and then the *fill* is nudged 1–4% away from that text until
+  the pair clears 4.5:1. Three of the eight presets sat at 4.2–4.3:1 without it, and a colour from
+  a CalDAV server can be anything at all. `EventColorsTest` covers the presets and the greys.
 - **Which calendars a view draws** — `visibleCalendarIds(repository, prefs)` in
   `ui/util/VisibleCalendars.kt` is the one source, intersecting the provider's `Calendars.VISIBLE`
   with the user's own toggle. Month uses `monthCalendarIds`, which layers a second, month-only
