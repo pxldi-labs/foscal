@@ -60,6 +60,14 @@ import kotlin.math.floor
  * visible on the last day.
  */
 val TimelineGutterWidth = 54.dp
+
+/**
+ * Taken off the bottom of every block so touching events keep a visible seam.
+ *
+ * Off the drawn height rather than out of the layout: the block still owns its slot, so the grid
+ * and the times stay honest and only the paint stops short.
+ */
+private val BlockGap = 3.dp
 val TimelineEndInset = 4.dp
 
 /** Grid hour to open on when no timed event and no "now" marker gives a better anchor. */
@@ -335,7 +343,12 @@ fun TimelineLayout(
                                             y = pe.topDp + hourHeight * ((drag?.deltaMinutes ?: 0) / 60f),
                                         )
                                         .width(eachWidth)
-                                        .height(pe.heightDp),
+                                        // A block is drawn slightly shorter than its slot, so two
+                                        // events that touch in time still have a seam between them.
+                                        // Without it 08:30-12:00 and 12:00-13:00 render as one
+                                        // long shape and the boundary has to be inferred from the
+                                        // titles.
+                                        .height((pe.heightDp - BlockGap).coerceAtLeast(12.dp)),
                                     onClick = { onEventClick(pe.event.id, pe.event.start.toEpochMilli()) },
                                     onMove = onEventMove?.let { move ->
                                         { deltaDays, deltaMinutes ->
@@ -644,6 +657,9 @@ private fun EventBlock(
                 )
             }
         } else {
+            // Title only. The block already says when it is — that is what its position and its
+            // length on the grid are for — so printing the times inside it is the same fact twice,
+            // taking the room the title wanted.
             Column(textPadding) {
                 Text(
                     event.title,
@@ -653,15 +669,6 @@ private fun EventBlock(
                     maxLines = maxTitleLines,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (showTime) {
-                    Text(
-                        "${start.toLocalTime().format(timeFmt)} – ${end.toLocalTime().format(timeFmt)}",
-                        color = mutedTextColor,
-                        fontSize = detailScale,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
         }
     }
