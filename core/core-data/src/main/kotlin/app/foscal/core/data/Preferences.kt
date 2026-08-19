@@ -2,6 +2,7 @@ package app.foscal.core.data
 
 import app.foscal.core.model.AccentColor
 import app.foscal.core.model.DayTapAction
+import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import java.time.DayOfWeek
@@ -94,6 +95,27 @@ interface Preferences {
     /** What tapping a day header in Week or 3 Days does. */
     val dayTapAction: Flow<DayTapAction>
 
+    /** How saturated an event block's fill is. */
+    val eventColorStrength: Flow<EventColorStrength>
+
+    /**
+     * Size of the text inside event blocks, as a percentage of the built-in size.
+     *
+     * A percentage of the app's own sizes rather than a font-scale multiplier: the system's
+     * accessibility font scale already applies on top of it, and a grid block is one of the few
+     * places where the user may genuinely want *smaller* than the body text so that more of a
+     * title fits.
+     */
+    val eventTextScalePercent: Flow<Int>
+
+    /**
+     * Whether a title too long for one line wraps onto the next inside an event block.
+     *
+     * Off means one line and an ellipsis. In a seven-column week a wrapped title is routinely
+     * broken mid-word, which some people would rather not see at all.
+     */
+    val wrapEventTitles: Flow<Boolean>
+
     /**
      * Which calendar a new event lands on, or null to use the first visible one.
      *
@@ -130,6 +152,9 @@ interface Preferences {
     suspend fun setDefaultEventMinutes(minutes: Int)
     suspend fun setShowWeekNumbers(enabled: Boolean)
     suspend fun setDayTapAction(action: DayTapAction)
+    suspend fun setEventColorStrength(strength: EventColorStrength)
+    suspend fun setEventTextScalePercent(percent: Int)
+    suspend fun setWrapEventTitles(wrap: Boolean)
 
     companion object {
         /** Reminder offset a brand-new install pre-fills on events. */
@@ -147,5 +172,16 @@ interface Preferences {
          * changes when the phone's language does.
          */
         val DEFAULT_FIRST_DAY: DayOfWeek = DayOfWeek.MONDAY
+
+        /** Event text at the size the app was designed around. */
+        const val DEFAULT_EVENT_TEXT_SCALE = 100
+
+        /**
+         * The sizes worth offering, smallest first.
+         *
+         * Five stops rather than a continuous slider: the difference a single percent makes to a
+         * 10sp label is nothing, and a dial that does nothing invites fiddling with it.
+         */
+        val EVENT_TEXT_SCALES = listOf(85, 92, 100, 112, 125)
     }
 }

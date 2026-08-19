@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.foscal.core.model.AccentColor
 import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.CalendarReminderDefaults
+import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
 import java.time.DayOfWeek
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -92,6 +93,20 @@ class UserPreferencesRepository @Inject constructor(
 
     override val dayTapAction: Flow<DayTapAction> =
         context.dataStore.data.map { DayTapAction.fromName(it[DAY_TAP_ACTION]) }
+
+    override val eventColorStrength: Flow<EventColorStrength> =
+        context.dataStore.data.map { EventColorStrength.fromKey(it[EVENT_COLOR_STRENGTH]) }
+
+    // Clamped on read as well as on write: a value written by an older or newer build has no
+    // business shrinking every title on the grid to nothing.
+    override val eventTextScalePercent: Flow<Int> =
+        context.dataStore.data.map {
+            (it[EVENT_TEXT_SCALE] ?: Preferences.DEFAULT_EVENT_TEXT_SCALE)
+                .coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE)
+        }
+
+    override val wrapEventTitles: Flow<Boolean> =
+        context.dataStore.data.map { it[WRAP_EVENT_TITLES] ?: true }
 
     override val defaultCalendarId: Flow<Long?> =
         context.dataStore.data.map { it[DEFAULT_CALENDAR_ID] }
@@ -185,6 +200,20 @@ class UserPreferencesRepository @Inject constructor(
         context.dataStore.edit { prefs -> prefs[DAY_TAP_ACTION] = action.name }
     }
 
+    override suspend fun setEventColorStrength(strength: EventColorStrength) {
+        context.dataStore.edit { prefs -> prefs[EVENT_COLOR_STRENGTH] = strength.key }
+    }
+
+    override suspend fun setEventTextScalePercent(percent: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[EVENT_TEXT_SCALE] = percent.coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE)
+        }
+    }
+
+    override suspend fun setWrapEventTitles(wrap: Boolean) {
+        context.dataStore.edit { prefs -> prefs[WRAP_EVENT_TITLES] = wrap }
+    }
+
     override suspend fun setUse24HourClock(use24Hour: Boolean) {
         context.dataStore.edit { prefs -> prefs[USE_24H_CLOCK] = use24Hour }
     }
@@ -196,6 +225,9 @@ class UserPreferencesRepository @Inject constructor(
     companion object {
         /** Stored stand-in for "None" — DataStore has no way to hold a null Int. */
         private const val NO_REMINDER = -1
+
+        private const val MIN_TEXT_SCALE = 70
+        private const val MAX_TEXT_SCALE = 150
 
         private val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         private val HIDDEN_CALENDARS = stringSetPreferencesKey("hidden_calendars")
@@ -216,5 +248,8 @@ class UserPreferencesRepository @Inject constructor(
         private val SHOW_WEEK_NUMBERS = booleanPreferencesKey("show_week_numbers")
         private val DAY_TAP_ACTION = stringPreferencesKey("day_tap_action")
         private val DEFAULT_CALENDAR_ID = longPreferencesKey("default_calendar_id")
+        private val EVENT_COLOR_STRENGTH = stringPreferencesKey("event_color_strength")
+        private val EVENT_TEXT_SCALE = intPreferencesKey("event_text_scale")
+        private val WRAP_EVENT_TITLES = booleanPreferencesKey("wrap_event_titles")
     }
 }

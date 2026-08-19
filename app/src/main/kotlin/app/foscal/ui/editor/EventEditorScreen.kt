@@ -68,13 +68,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -187,12 +192,37 @@ private fun EditorForm(
     Column(modifier = modifier.verticalScroll(rememberScrollState())) {
         // Title
         Section {
+            // Held here as a TextFieldValue rather than read straight off the state, because the
+            // selection is part of what this field has to say: a new event opens with the title
+            // selected so the first keystroke replaces whatever was pre-filled instead of landing
+            // after it. The view model still owns the text.
+            var titleField by remember {
+                mutableStateOf(
+                    TextFieldValue(state.title, TextRange(0, state.title.length)),
+                )
+            }
+            val titleFocus = remember { FocusRequester() }
+            val keyboard = LocalSoftwareKeyboardController.current
+            // Only on a new event. Opening an existing one to change its time should not put a
+            // keyboard over the form and the whole title under a selection one stray key erases.
+            // The keyboard is asked for explicitly as well as implied by the focus: a request that
+            // lands while the editor is still crossfading in is quietly dropped by the IME.
+            LaunchedEffect(state.isEditing) {
+                if (!state.isEditing) {
+                    titleFocus.requestFocus()
+                    keyboard?.show()
+                }
+            }
             OutlinedTextField(
-                value = state.title,
-                onValueChange = viewModel::updateTitle,
+                value = titleField,
+                onValueChange = {
+                    titleField = it
+                    viewModel.updateTitle(it.text)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .focusRequester(titleFocus),
                 placeholder = { Text("Add title") },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.titleLarge,

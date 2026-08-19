@@ -51,6 +51,7 @@ import app.foscal.ui.common.TimelineEndInset
 import app.foscal.ui.common.TimelineGutterWidth
 import app.foscal.ui.common.TimelineLayout
 import app.foscal.ui.common.pageOnSwipe
+import app.foscal.ui.home.BehaviourViewModel
 import app.foscal.ui.util.currentLocale
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -71,9 +72,11 @@ fun TimelineRoute(
     onNewEvent: (startMillis: Long, endMillis: Long) -> Unit,
     onOpenDay: (LocalDate) -> Unit,
     viewModel: WeekViewModel = hiltViewModel(),
+    behaviourViewModel: BehaviourViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(span) { viewModel.setSpan(span) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val behaviour by behaviourViewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -162,6 +165,7 @@ fun TimelineRoute(
                         onEventClick = onEventClick,
                         onNewEvent = onNewEvent,
                         onEventMove = viewModel::moveEvent,
+                        newEventMinutes = behaviour.defaultEventMinutes,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -177,6 +181,7 @@ private fun WeekScheduleList(
     onEventClick: (eventId: Long, instanceStartMillis: Long) -> Unit,
     onNewEvent: (startMillis: Long, endMillis: Long) -> Unit,
     onEventMove: (app.foscal.core.model.Event, Long, Long) -> Unit,
+    newEventMinutes: Int,
     modifier: Modifier = Modifier,
 ) {
     TimelineLayout(
@@ -184,6 +189,7 @@ private fun WeekScheduleList(
         onEventClick = onEventClick,
         onTimeRangeSelected = onNewEvent,
         onEventMove = onEventMove,
+        newEventMinutes = newEventMinutes,
         modifier = modifier,
         compact = compact,
     )

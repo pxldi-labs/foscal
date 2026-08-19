@@ -9,6 +9,7 @@ package app.foscal.ui.settings
  */
 enum class SettingsSection(val title: String, val summary: String) {
     Appearance("Appearance", "Theme, colour"),
+    CalendarStyle("Calendar style", "How events are drawn on the grid"),
     CalendarView("Calendar", "Which view opens, when the week starts"),
     NewEvents("New events", "Where they go and how long they last"),
     Calendars("Calendars", "What shows, and reminders per calendar"),

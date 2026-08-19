@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,11 +18,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,14 +53,20 @@ import androidx.compose.ui.unit.sp
 import app.foscal.core.model.Event
 import app.foscal.core.ui.theme.LocalIsDarkTheme
 import app.foscal.ui.eventColors
+import app.foscal.ui.util.LocalEventTextScale
 import app.foscal.ui.util.LocalUse24HourClock
+import app.foscal.ui.util.LocalWrapEventTitles
 import app.foscal.ui.util.currentLocale
+import app.foscal.ui.util.scaledBy
 import app.foscal.ui.util.timeFormatter
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 /**
  * Width of the hour-label gutter and the inset at the far edge of the grid. Any header rendered
@@ -81,7 +93,17 @@ private val MinBlockHeight = 16.dp
 
 /** How close the current time has to be to an hour before that hour's label steps aside. */
 private val NowLabelClearance = 16.dp
+
 val TimelineEndInset = 4.dp
+
+/**
+ * What a drag or a tap on an empty part of the grid snaps to.
+ *
+ * Ten minutes rather than a quarter of an hour: a stand-up, a call and a school run are all things
+ * people book in tens, and at any sensible hour height ten minutes is still several dp — enough
+ * that the block visibly answers the finger rather than sticking and then jumping.
+ */
+private const val SnapMinutes = 10
 
 /** Grid hour to open on when no timed event and no "now" marker gives a better anchor. */
 private const val DEFAULT_ANCHOR_HOUR = 8
@@ -145,6 +167,8 @@ fun TimelineLayout(
     accentStripe: Boolean = !compact,
     onTimeRangeSelected: ((startMillis: Long, endMillis: Long) -> Unit)? = null,
     onEventMove: ((event: Event, newStartMillis: Long, newEndMillis: Long) -> Unit)? = null,
+    /** How long a block placed by a tap — or by a long press that never moved — comes out. */
+    newEventMinutes: Int = 60,
 ) {
     val scrollState = rememberScrollState()
     val density = LocalDensity.current
@@ -183,7 +207,22 @@ fun TimelineLayout(
     val locale = currentLocale()
     val nowLabelFmt = remember(is24Hour, locale) { timeFormatter(is24Hour, locale) }
     var selection by remember { mutableStateOf<TimeSelection?>(null) }
+    // Where a tap has parked a new-event block, waiting for a second tap to open the editor. Held
+    // here rather than in the day column so tapping another day moves the one block instead of
+    // leaving a trail of them behind.
+    var placement by remember { mutableStateOf<NewEventPlacement?>(null) }
+    // A long press reaches the tap detector too, as a very slow tap, and would park a block on top
+    // of the event the drag just created. Set when the press becomes a drag and cleared at the
+    // start of every press, so it only ever suppresses the tap belonging to that same gesture.
+    var longPressActive by remember { mutableStateOf(false) }
     var eventDrag by remember { mutableStateOf<EventDrag?>(null) }
+    // What is pending on the grid right now, as a day and a range of minutes: a drag in progress
+    // beats a parked block, since the finger is on the first one.
+    val pending: Pair<LocalDate, IntRangeLike>? = selection?.let { it.date to it.span(newEventMinutes) }
+        ?: placement?.let { it.date to it.span(newEventMinutes) }
+    val pendingLabel = pending?.let { (_, range) ->
+        "${minuteLabel(range.first, nowLabelFmt)} – ${minuteLabel(range.second, nowLabelFmt)}"
+    }
 
     // Open on the part of the day the user cares about. A fixed early-morning offset means that
     // opening the app in the afternoon shows an empty grid with the next event scrolled off below.
@@ -212,7 +251,7 @@ fun TimelineLayout(
         }
 
         Column(modifier = Modifier.verticalScroll(scrollState)) {
-            Box {
+            BoxWithConstraints {
                 Row(
                     modifier = Modifier
                         .height(totalHeight)
@@ -252,14 +291,21 @@ fun TimelineLayout(
                                 .fillMaxHeight()
                                 .then(
                                     if (onTimeRangeSelected != null) {
-                                        Modifier.pointerInput(day.date, hourHeight, onTimeRangeSelected) {
+                                        Modifier.pointerInput(day.date, hourHeight, newEventMinutes, onTimeRangeSelected) {
+                                            // Rounded, not truncated. Truncating biases every edge
+                                            // of the drag upward by up to a whole step, so the
+                                            // block trails the finger on the way down and leads it
+                                            // on the way back — which is what made this feel
+                                            // sticky rather than merely coarse.
                                             fun minuteAt(y: Float): Int {
-                                                val raw = (y / hourHeight.toPx() * 60f).toInt()
-                                                return raw.roundToStep(15).coerceIn(0, 24 * 60)
+                                                val raw = (y / hourHeight.toPx() * 60f).roundToInt()
+                                                return raw.roundToStep(SnapMinutes).coerceIn(0, 24 * 60)
                                             }
 
                                             detectDragGesturesAfterLongPress(
                                                 onDragStart = { offset ->
+                                                    longPressActive = true
+                                                    placement = null
                                                     val minute = minuteAt(offset.y)
                                                     selection = TimeSelection(day.date, minute, minute)
                                                 },
@@ -273,22 +319,43 @@ fun TimelineLayout(
                                                     val finalSelection = selection
                                                     selection = null
                                                     if (finalSelection != null) {
-                                                        val range = finalSelection.normalized()
-                                                        val startMinute = range.first
-                                                        val endMinute = when {
-                                                            range.second > range.first -> range.second
-                                                            range.first <= 23 * 60 -> range.first + 60
-                                                            else -> 24 * 60
-                                                        }
+                                                        val range = finalSelection.span(newEventMinutes)
                                                         val start = finalSelection.date.atStartOfDay(zone)
-                                                            .plusMinutes(startMinute.toLong())
+                                                            .plusMinutes(range.first.toLong())
                                                         val end = finalSelection.date.atStartOfDay(zone)
-                                                            .plusMinutes(endMinute.toLong())
+                                                            .plusMinutes(range.second.toLong())
                                                         onTimeRangeSelected(
                                                             start.toInstant().toEpochMilli(),
                                                             end.toInstant().toEpochMilli(),
                                                         )
                                                     }
+                                                },
+                                            )
+                                        }
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                // A plain tap parks a block instead of opening the editor. The
+                                // block itself carries the click that opens it, so this only ever
+                                // sees taps on empty grid — one on an event, or on a parked block,
+                                // is consumed before it gets here.
+                                .then(
+                                    if (onTimeRangeSelected != null) {
+                                        Modifier.pointerInput(day.date, hourHeight, newEventMinutes) {
+                                            detectTapGestures(
+                                                onPress = { longPressActive = false },
+                                                onTap = { offset ->
+                                                    if (longPressActive) return@detectTapGestures
+                                                    selection = null
+                                                    // Floored, not rounded: a block starting above
+                                                    // where the finger landed reads as a miss.
+                                                    val raw = (offset.y / hourHeight.toPx() * 60f).toInt()
+                                                    val latest = (24 * 60 - newEventMinutes).coerceAtLeast(0)
+                                                    placement = NewEventPlacement(
+                                                        day.date,
+                                                        raw.floorToStep(SnapMinutes).coerceIn(0, latest),
+                                                    )
                                                 },
                                             )
                                         }
@@ -316,23 +383,6 @@ fun TimelineLayout(
                                     )
                                 }
                             }
-                            selection
-                                ?.takeIf { it.date == day.date }
-                                ?.let { current ->
-                                    val range = current.normalized()
-                                    val top = hourHeight * (range.first / 60f)
-                                    val height = (hourHeight * ((range.second - range.first).coerceAtLeast(15) / 60f))
-                                        .coerceAtLeast(18.dp)
-                                    Box(
-                                        modifier = Modifier
-                                            .offset(y = top)
-                                            .fillMaxWidth()
-                                            .height(height)
-                                            .padding(horizontal = 3.dp)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
-                                    )
-                                }
                             val positioned = remember(day.events, hourHeight, zone) {
                                 layoutTimed(day.events, hourHeight, zone)
                             }
@@ -416,6 +466,50 @@ fun TimelineLayout(
                                     hourHeight = hourHeight,
                                 )
                             }
+                            // Over the events, not under them: a range being drawn across a
+                            // full day is exactly when you need to see where its edges land.
+                            selection
+                                ?.takeIf { it.date == day.date }
+                                ?.let { current ->
+                                    val range = current.span(newEventMinutes)
+                                    Box(
+                                        modifier = Modifier
+                                            .offset(y = hourHeight * (range.first / 60f))
+                                            .fillMaxWidth()
+                                            .height(range.heightAt(hourHeight))
+                                            .padding(horizontal = 3.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                            ),
+                                    )
+                                }
+                            placement
+                                ?.takeIf { it.date == day.date }
+                                ?.let { spot ->
+                                    val range = spot.span(newEventMinutes)
+                                    NewEventPlaceholder(
+                                        label = pendingLabel.orEmpty(),
+                                        compact = compact,
+                                        cornerRadius = blockCornerRadius,
+                                        modifier = Modifier
+                                            .offset(y = hourHeight * (range.first / 60f))
+                                            .fillMaxWidth()
+                                            .height(range.heightAt(hourHeight))
+                                            .padding(horizontal = 3.dp),
+                                        onClick = {
+                                            placement = null
+                                            val start = spot.date.atStartOfDay(zone)
+                                                .plusMinutes(range.first.toLong())
+                                            val end = spot.date.atStartOfDay(zone)
+                                                .plusMinutes(range.second.toLong())
+                                            onTimeRangeSelected?.invoke(
+                                                start.toInstant().toEpochMilli(),
+                                                end.toInstant().toEpochMilli(),
+                                            )
+                                        },
+                                    )
+                                }
                             // Last, so it crosses the blocks instead of hiding behind them. The
                             // whole point of the line is to say where you are in a day that is
                             // mostly full of events; underneath them it only shows in the gaps.
@@ -459,25 +553,130 @@ fun TimelineLayout(
                         )
                     }
                 }
+                // What the block being drawn or parked actually covers, in a pill above it.
+                // Overlaid on the Row rather than drawn inside the day column, because a week
+                // column is about forty-five dp wide and "09:1…" is not a time.
+                if (pending != null && pendingLabel != null) {
+                    val columnIndex = timedDays.indexOfFirst { it.date == pending.first }
+                    if (columnIndex >= 0) {
+                        val dayWidth = (maxWidth - TimelineGutterWidth - TimelineEndInset) /
+                            timedDays.size.coerceAtLeast(1)
+                        // Measured rather than guessed: the label is two times in the user's own
+                        // format and locale, which is anywhere from "9 AM – 10 AM" to "09:10 –
+                        // 10:20", and a pill that runs off the last column is the one case where
+                        // it matters most.
+                        var bubbleWidth by remember { mutableStateOf(0.dp) }
+                        Box(
+                            Modifier
+                                .offset(
+                                    x = (TimelineGutterWidth + dayWidth * columnIndex)
+                                        .coerceAtMost((maxWidth - bubbleWidth - 2.dp).coerceAtLeast(0.dp)),
+                                    y = (hourHeight * (pending.second.first / 60f) - 25.dp)
+                                        .coerceAtLeast(0.dp),
+                                )
+                                .onSizeChanged { bubbleWidth = with(density) { it.width.toDp() } }
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.primary)
+                                .padding(horizontal = 9.dp, vertical = 3.dp),
+                        ) {
+                            Text(
+                                pendingLabel,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-private data class TimeSelection(
+internal data class TimeSelection(
     val date: LocalDate,
     val startMinute: Int,
     val endMinute: Int,
 ) {
-    fun normalized(): IntRangeLike =
-        if (startMinute <= endMinute) {
-            IntRangeLike(startMinute, endMinute)
+    /**
+     * The range this drag actually stands for, in minutes from midnight.
+     *
+     * A long press that never moved has no range of its own, so it means "the usual length here" —
+     * and it means that from the moment it lands, not only once the finger lifts, which is why the
+     * preview, the pill and the event that gets created all read it from here.
+     */
+    fun span(defaultMinutes: Int): IntRangeLike {
+        val low = minOf(startMinute, endMinute)
+        val high = maxOf(startMinute, endMinute)
+        return if (high > low) {
+            IntRangeLike(low, high)
         } else {
-            IntRangeLike(endMinute, startMinute)
+            IntRangeLike(low, (low + defaultMinutes).coerceAtMost(24 * 60))
         }
+    }
 }
 
-private data class IntRangeLike(val first: Int, val second: Int)
+/** Where a tap has parked a new-event block, waiting for the second tap that opens the editor. */
+internal data class NewEventPlacement(val date: LocalDate, val startMinute: Int) {
+    fun span(defaultMinutes: Int): IntRangeLike =
+        IntRangeLike(startMinute, (startMinute + defaultMinutes).coerceAtMost(24 * 60))
+}
+
+internal data class IntRangeLike(val first: Int, val second: Int) {
+    /** Tall enough to see and to hit, whatever the range says. */
+    fun heightAt(hourHeight: Dp): Dp =
+        (hourHeight * ((second - first) / 60f)).coerceAtLeast(20.dp)
+}
+
+/** "09:10" or "9:10 AM", from minutes past midnight. Midnight tomorrow prints as midnight. */
+private fun minuteLabel(minute: Int, formatter: DateTimeFormatter): String =
+    LocalTime.MIDNIGHT.plusMinutes((minute % (24 * 60)).toLong()).format(formatter)
+
+/**
+ * The block a tap parks on the grid: an hour of nothing, offering to become an event.
+ *
+ * Outlined rather than filled, and in the accent rather than a calendar colour, because it is not
+ * an event yet — it is a proposal, and it has to be tellable at a glance from the blocks around it
+ * that are real. The time is in the pill above it, so a week column only has to fit the plus.
+ */
+@Composable
+private fun NewEventPlaceholder(
+    label: String,
+    compact: Boolean,
+    cornerRadius: Dp,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(cornerRadius)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(accent.copy(alpha = 0.16f))
+            .border(1.5.dp, accent, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = if (compact) 2.dp else 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (compact) Arrangement.Center else Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            Icons.Filled.Add,
+            contentDescription = "New event",
+            tint = accent,
+            modifier = Modifier.size(if (compact) 14.dp else 18.dp),
+        )
+        if (!compact) {
+            Text(
+                label,
+                color = accent,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 private data class EventDrag(
     val eventId: Long,
@@ -486,10 +685,12 @@ private data class EventDrag(
     val deltaMinutes: Int,
 )
 
-private fun Int.roundToStep(step: Int): Int {
+internal fun Int.roundToStep(step: Int): Int {
     val half = step / 2
     return ((this + half) / step) * step
 }
+
+internal fun Int.floorToStep(step: Int): Int = Math.floorDiv(this, step) * step
 
 /** An all-day event and the inclusive range of visible day columns it covers. */
 internal data class AllDaySpan(val event: Event, val firstCol: Int, val lastCol: Int)
@@ -591,6 +792,8 @@ private fun AllDayBar(event: Event, modifier: Modifier, onClick: () -> Unit) {
         Text(
             event.title,
             style = MaterialTheme.typography.labelSmall,
+            fontSize = MaterialTheme.typography.labelSmall.fontSize
+                .scaledBy(LocalEventTextScale.current),
             color = colors.content,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -638,9 +841,13 @@ private fun EventBlock(
         compact -> Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 2.dp)
         else -> Modifier.fillMaxSize().padding(start = 10.dp, end = 8.dp, top = 6.dp, bottom = 5.dp)
     }
-    val titleScale = if (compact) 10.sp else 13.sp
-    val detailScale = if (compact) 10.sp else 11.sp
-    val maxTitleLines = if (compact) 3 else 2
+    val textScale = LocalEventTextScale.current
+    val titleScale = (if (compact) 10.sp else 13.sp).scaledBy(textScale)
+    val detailScale = (if (compact) 10.sp else 11.sp).scaledBy(textScale)
+    // One line and an ellipsis when the user has turned wrapping off. A week column is narrow
+    // enough that a wrapped title is routinely broken mid-word, and some people would rather see
+    // the start of the title than all of it in pieces.
+    val maxTitleLines = if (!LocalWrapEventTitles.current) 1 else if (compact) 3 else 2
 
     Row(
         modifier = modifier
@@ -715,11 +922,11 @@ private fun EventBlock(
                     event.title,
                     fontWeight = FontWeight.Medium,
                     color = textColor,
-                    fontSize = 10.sp,
+                    fontSize = 10.sp.scaledBy(textScale),
                     // No leading. A ten-minute event is about ten dp of grid, and the two dp a
                     // default line height adds above and below the glyphs is the difference
                     // between a title and a sliced-off title.
-                    lineHeight = 10.sp,
+                    lineHeight = 10.sp.scaledBy(textScale),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

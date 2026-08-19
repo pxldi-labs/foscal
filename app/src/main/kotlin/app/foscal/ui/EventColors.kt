@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import app.foscal.core.ui.theme.LocalIsDarkTheme
+import app.foscal.ui.util.LocalEventColorStrength
 
 /** The two colours an event is drawn in, derived once from its calendar's colour. */
 data class EventColors(
@@ -28,14 +29,24 @@ data class EventColors(
  *
  * Dark theme pulls the fill toward the surface. The same saturated colour that reads as confident
  * on white glares on near-black, and a wall of them is exhausting.
+ *
+ * How far past that it goes is the user's to choose, through
+ * [app.foscal.core.model.EventColorStrength]. Whatever they pick, the ink is chosen against the
+ * fill that comes out and then nudged for contrast, so a softer wall of blocks is still readable
+ * rather than merely quieter.
  */
 @Composable
 fun eventColors(eventColorArgb: Int): EventColors {
     val dark = LocalIsDarkTheme.current
     val surface = MaterialTheme.colorScheme.surface
-    return remember(eventColorArgb, dark, surface) {
+    val strength = LocalEventColorStrength.current
+    return remember(eventColorArgb, dark, surface, strength) {
         val accent = Color(eventColorArgb)
-        val base = if (dark) lerp(accent, surface, 0.30f) else accent
+        // Dark theme's own 30% is the floor, and the user's wash is spent on what is left of the
+        // way to the surface — otherwise "Very soft" in dark mode lands past the background and
+        // the block stops being an object on the grid.
+        val wash = if (dark) 0.30f + strength.wash * 0.70f else strength.wash
+        val base = if (wash > 0f) lerp(accent, surface, wash) else accent
         val ink = readableOn(base)
         EventColors(container = legible(base, ink), content = ink, accent = accent)
     }

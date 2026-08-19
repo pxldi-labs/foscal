@@ -97,10 +97,20 @@ The emulator runs **outside** the dev container and is reached over adb — ther
 `emulator` binary or system image inside the image, so you cannot start or create an AVD
 from here. `adb devices` is the authority on whether one is attached.
 
-- **Verify the device before trusting coordinates.** The current device is
-  **320x640 at density 160**, where screenshots are native size and taps map **1:1**. An
-  earlier AVD was 1080x2400 and needed a 1.2x factor. Always run `adb shell wm size` first;
-  a stale factor silently sends every tap to the wrong widget.
+- **Verify the device before trusting coordinates.** `adb shell wm size` reports both a physical
+  size and an *override*, and the override is what taps and dumps are in — the current AVD is
+  320x640 physical but 1080x1920 override at density 420. Reading the physical line sends every
+  tap to a third of the screen. Always run it first; a stale factor silently sends every tap to
+  the wrong widget.
+- **`screencap` returns a black frame on this AVD, but `uiautomator dump` works.** There is no
+  point diagnosing the black PNG: use the hierarchy instead. It carries every label and its
+  bounds, which is enough to drive the UI *and* to measure it — a title that wrapped is twice as
+  tall as one that did not, and a text scale change shows up as a wider node. Note that the `text`
+  it reports for an ellipsised label is the *laid out* text, not the original string, which is
+  itself a usable signal.
+- **`input swipe` cannot produce a long-press drag** — it moves past touch slop before the press
+  becomes long. Use `input motionevent DOWN x y`, then separate `MOVE` calls (each round trip is
+  well over the long-press timeout), then `UP`.
 - **No KVM, so it is slow.** `am start` returns immediately while the app is still starting;
   the first frame took ~20s. Poll `dumpsys window | grep mCurrentFocus` until it names the
   activity instead of screenshotting straight away, or you will capture the launcher and
@@ -137,9 +147,11 @@ current tab), event create/edit/delete, recurring events
 join-video-call action, real calendar colors,
 offline local calendars, `.ics` import/export via the system document picker,
 permission-first onboarding. Week view is the shared
-hourly `TimelineLayout` with long-press drag-to-create and long-press
-drag-to-move for timed events; recurring timed moves are stored as single
-occurrence exceptions. There is no separate Day view — it was dropped as
+hourly `TimelineLayout` with long-press drag-to-create (snapped to ten minutes, with a
+pill above the block naming the range), tap-to-park-then-tap-to-open for a
+default-length event, and long-press drag-to-move for timed events; recurring timed
+moves are stored as single occurrence exceptions. How events are *drawn* — colour
+strength, title size, whether titles wrap — is the "Calendar style" settings page. There is no separate Day view — it was dropped as
 redundant (Week's schedule + Agenda cover it). See the README "Current status"
 and "Roadmap" sections for the full picture and what's next.
 
@@ -340,6 +352,21 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
 - **`ensureLocalCalendar` is find-or-create, deliberately.** The Calendar Provider outlives the
   app's own data, so a plain insert on every onboarding run adds a duplicate "My calendar" after
   each data clear or reinstall and strands the user's events in the first one.
+- **The grid's tap and its long-press drag are two pointer inputs on one node, and they both
+  see every gesture.** `detectTapGestures` fires on the release of a *long* press too — it is only
+  a very slow tap as far as it is concerned — so without `longPressActive` a drag that created an
+  event also parked a block on top of it. The flag is set in `onDragStart` and cleared in the tap
+  detector's `onPress`, which runs on the down of every gesture and therefore always before the
+  long press it might belong to. Do not "fix" this by passing `onLongPress` to `detectTapGestures`
+  instead: that path calls `consumeUntilUp()`, which eats the very move events the drag detector
+  needs and kills the drag outright.
+- **A drag rounds to the nearest snap step and a tap floors to it, deliberately.** Rounding a drag
+  keeps both edges under the finger; flooring a tap keeps the block from starting above where the
+  finger landed, which reads as a missed tap rather than as a snap.
+- **`eventColors` is the only thing that knows about `EventColorStrength`.** The wash is applied
+  before the ink is chosen, never after, so every strength gets ink picked against the fill it
+  actually has and the 4.5:1 nudge still applies. A settings swatch renders its own strength by
+  providing `LocalEventColorStrength` over the ambient one rather than by reimplementing the maths.
 - **Timeline headers must use `TimelineGutterWidth` / `TimelineEndInset`.** Any weekday strip drawn
   above a `TimelineLayout` shares those two values or its columns drift out of alignment with the
   grid columns below; the error accumulates across the week and shows up on the last day.

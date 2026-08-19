@@ -99,9 +99,11 @@ fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: CalendarsViewModel = hiltViewModel(),
     behaviourViewModel: BehaviourViewModel = hiltViewModel(),
+    eventStyleViewModel: EventStyleViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val behaviour by behaviourViewModel.state.collectAsStateWithLifecycle()
+    val eventStyle by eventStyleViewModel.state.collectAsStateWithLifecycle()
     // One calendar open at a time: the per-calendar panel is tall, and several expanded at once
     // turns the list into something you have to scroll to find anything in.
     var expandedCalendarId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -143,6 +145,9 @@ fun SettingsScreen(
             when (section) {
                 null -> settingsIndex(onOpenSection)
                 SettingsSection.Appearance -> appearanceSection(state, viewModel)
+                SettingsSection.CalendarStyle -> item {
+                    CalendarStyleSettings(state = eventStyle, viewModel = eventStyleViewModel)
+                }
                 SettingsSection.CalendarView -> item {
                     CalendarViewSettings(
                         state = behaviour,
