@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.foscal.core.model.Event
-import app.foscal.ui.contrastColor
+import app.foscal.ui.eventColors
 import app.foscal.ui.util.LocalUse24HourClock
 import app.foscal.ui.util.currentLocale
 import app.foscal.ui.util.timeFormatter
@@ -512,21 +512,32 @@ internal fun assignAllDayLanes(spans: List<AllDaySpan>): List<List<AllDaySpan>> 
 
 @Composable
 private fun AllDayBar(event: Event, modifier: Modifier, onClick: () -> Unit) {
+    // Tinted with a stripe, exactly like a timed block. It used to be a solid slab of the raw
+    // calendar colour, which put the two things ten times apart in weight for no reason anyone
+    // looking at them could work out — an all-day event is not ten times more important than a
+    // meeting. Being small is what earns it the extra emphasis, and the stripe carries that.
+    val colors = eventColors(event.color)
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(paletteColor(event))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp),
+            .background(colors.container)
+            .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            Modifier
+                .width(2.5.dp)
+                .fillMaxHeight()
+                .background(colors.accent),
+        )
         Text(
             event.title,
             style = MaterialTheme.typography.labelSmall,
-            color = contrastColor(event.color),
+            color = colors.content,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 6.dp),
         )
     }
 }
@@ -550,9 +561,11 @@ private fun EventBlock(
     dayWidth: Dp = 0.dp,
     hourHeight: Dp = 60.dp,
 ) {
-    val baseColor = paletteColor(event)
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val mutedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val colors = eventColors(event.color)
+    val baseColor = colors.accent
+    val textColor = colors.content
+    // The same hue, stepped back, so the time reads as secondary without falling out of the block.
+    val mutedTextColor = colors.content.copy(alpha = 0.75f)
     val start = event.start.atZone(zone)
     val end = event.end.atZone(zone)
     val is24Hour = LocalUse24HourClock.current
@@ -573,7 +586,7 @@ private fun EventBlock(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
-            .background(baseColor.copy(alpha = if (compact) 0.12f else 0.10f))
+            .background(colors.container)
             .then(
                 if (onMove != null) {
                     Modifier.pointerInput(event.id, event.start, eventLeftInDay, dayWidth, hourHeight) {
@@ -619,14 +632,14 @@ private fun EventBlock(
             )
             .clickable(onClick = onClick),
     ) {
-        if (accentStripe) {
-            Box(
-                Modifier
-                    .width(3.dp)
-                    .fillMaxHeight()
-                    .background(baseColor),
-            )
-        }
+        // A stripe everywhere, not only in the wide views. A week column used to get the tint and
+        // nothing else, which is what made those blocks look washed out next to an all-day bar.
+        Box(
+            Modifier
+                .width(if (accentStripe) 3.dp else 2.5.dp)
+                .fillMaxHeight()
+                .background(baseColor),
+        )
         Column(textPadding) {
             Text(
                 event.title,
@@ -648,8 +661,6 @@ private fun EventBlock(
         }
     }
 }
-
-private fun paletteColor(event: Event): Color = Color(event.color)
 
 internal data class PositionedEvent(
     val event: Event,
