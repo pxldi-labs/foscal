@@ -8,9 +8,19 @@ import androidx.compose.ui.graphics.Color
 val FoscalBlue = Color(0xFF4355F4)
 val FoscalBlueDark = Color(0xFFAAB2FA)
 
+/** The icon's second blue. Cobalt's secondary, so the palette that made the mark runs on. */
+val FoscalPeriwinkle = Color(0xFF8691F7)
+
 /**
- * Tokens for one accent preset. The rest of the UI reads only `colorScheme.primary` and the
- * primary-container pair, so these five colors fully define an accent in both light and dark.
+ * Tokens for one accent preset, in both light and dark.
+ *
+ * Two roles, not one. The UI reads `primary` for the things it wants you to look at — today, the
+ * FAB, a selection — and `secondaryContainer` for the things that are simply there, like the view
+ * switcher and the Edit button. Those used to be handed the primary pair as well, which made every
+ * tinted surface in the app the same blue and left the second colour of the palette unused.
+ *
+ * There is deliberately no tertiary: nothing in the app reads one, and a colour nothing draws is
+ * not a palette, it is a comment.
  */
 data class AccentTokens(
     val primaryLight: Color,
@@ -20,6 +30,12 @@ data class AccentTokens(
     val onPrimaryDark: Color,
     val primaryContainerDark: Color,
     val onPrimaryContainerDark: Color,
+    val secondaryLight: Color,
+    val secondaryContainerLight: Color,
+    val onSecondaryContainerLight: Color,
+    val secondaryDark: Color,
+    val secondaryContainerDark: Color,
+    val onSecondaryContainerDark: Color,
 )
 
 val CobaltAccent = AccentTokens(
@@ -30,6 +46,13 @@ val CobaltAccent = AccentTokens(
     onPrimaryDark = Color(0xFF080A1D),
     primaryContainerDark = Color(0xFF202975),
     onPrimaryContainerDark = Color(0xFFE1E4FD),
+    // The periwinkle, darkened until it clears 4.5:1 as text on white.
+    secondaryLight = Color(0xFF666EBC),
+    secondaryContainerLight = Color(0xFFE0E2FD),
+    onSecondaryContainerLight = Color(0xFF262945),
+    secondaryDark = FoscalPeriwinkle,
+    secondaryContainerDark = Color(0xFF2E3154),
+    onSecondaryContainerDark = Color(0xFFDDE0FD),
 )
 
 val VioletAccent = AccentTokens(
@@ -40,6 +63,12 @@ val VioletAccent = AccentTokens(
     onPrimaryDark = Color(0xFF17093B),
     primaryContainerDark = Color(0xFF39236E),
     onPrimaryContainerDark = Color(0xFFE7DEFF),
+    secondaryLight = Color(0xFF796D9E),
+    secondaryContainerLight = Color(0xFFEFEAFF),
+    onSecondaryContainerLight = Color(0xFF373147),
+    secondaryDark = Color(0xFFC3B0FF),
+    secondaryContainerDark = Color(0xFF423C57),
+    onSecondaryContainerDark = Color(0xFFEEE9FF),
 )
 
 val ForestAccent = AccentTokens(
@@ -50,6 +79,12 @@ val ForestAccent = AccentTokens(
     onPrimaryDark = Color(0xFF032013),
     primaryContainerDark = Color(0xFF145033),
     onPrimaryContainerDark = Color(0xFFC9F3D8),
+    secondaryLight = Color(0xFF4C7D65),
+    secondaryContainerLight = Color(0xFFDEF3E8),
+    onSecondaryContainerLight = Color(0xFF243B2F),
+    secondaryDark = Color(0xFF7FD1A8),
+    secondaryContainerDark = Color(0xFF2B4739),
+    onSecondaryContainerDark = Color(0xFFDBF2E7),
 )
 
 // Weekend day-of-week labels. Muted gold in light; a lighter amber that survives the dark
