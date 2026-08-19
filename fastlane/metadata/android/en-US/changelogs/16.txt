@@ -1,0 +1,7 @@
+Answering an invitation now works on accounts that store your address in a
+different case, where the buttons could match nothing and fail silently. A
+reply the calendar refuses says so instead of looking like it worked.
+
+The event screen folds the attendee list behind a count of who is coming, and
+states each answer plainly. Edit moved to the top right, next to a menu with
+Duplicate and Delete. Guests are called attendees throughout.
