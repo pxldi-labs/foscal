@@ -209,8 +209,11 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   `ic_foscal_badge.xml`). Keep them in sync if you change one, and redraw
   `ic_launcher_monochrome.xml` alongside — the themed-icon layer is a silhouette, so
   the grid has to be punched out with `fillType="evenOdd"` rather than drawn in a
-  second colour. `ic_notification_calendar.xml` is the same mark again but simplified
-  to one row of three under a band: at 24dp the full grid closes into a smear. Brand palette: ground `#4355F4`, card `#FFFFFF`, band `#FFC94D`,
+  second colour. `ic_notification_calendar.xml` is deliberately *not* the mark: a
+  status-bar glyph is one flat colour a few millimetres wide in a row of rounded squares,
+  so it is a wall calendar with legs, which is the shape that reads as a calendar at that
+  size. It uses exactly two overlapping shapes — a third would XOR the header band back
+  into a hole under `fillType="evenOdd"`. Brand palette: ground `#4355F4`, card `#FFFFFF`, band `#FFC94D`,
   tab `#8691F7`. The grid dots are drawn in the ground colour so they read as punched
   through the card rather than printed on it. The first two are also the Cobalt accent's
   primary and secondary in `:core-ui`, so the app matches the icon that opened it; the
