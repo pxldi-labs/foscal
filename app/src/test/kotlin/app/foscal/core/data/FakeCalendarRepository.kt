@@ -2,6 +2,7 @@ package app.foscal.core.data
 
 import android.net.Uri
 import app.foscal.core.model.Attendee
+import app.foscal.core.model.AttendeeStatus
 import app.foscal.core.model.Calendar
 import app.foscal.core.model.Event
 import app.foscal.core.model.EventInput
@@ -126,6 +127,14 @@ class FakeCalendarRepository(
 
     /** Names handed to [createLocalCalendar], in order. */
     val createdCalendars = mutableListOf<Pair<String, Int>>()
+
+    /** Replies handed to [setSelfAttendeeStatus], in order. */
+    val replies = mutableListOf<Pair<Long, AttendeeStatus>>()
+
+    override suspend fun setSelfAttendeeStatus(eventId: Long, status: AttendeeStatus): Boolean {
+        replies += eventId to status
+        return true
+    }
 
     /** Every edit handed to [updateLocalCalendar], in order. */
     val updatedCalendars = mutableListOf<Triple<Long, String, Int>>()

@@ -111,6 +111,19 @@ interface CalendarRepository {
      */
     suspend fun updateLocalCalendar(calendarId: Long, name: String, color: Int): Boolean
 
+    /**
+     * Answers an invitation on the user's own behalf.
+     *
+     * Writes the status onto the user's own `Attendees` row and onto the event's
+     * `SELF_ATTENDEE_STATUS`, without the sync-adapter flag, so the provider marks the event dirty
+     * and whatever adapter owns the calendar picks the reply up. Whether it reaches the organiser
+     * is that adapter's business; this app sends no mail of its own.
+     *
+     * Returns false when the event has no row for this calendar's owner — an event nobody invited
+     * the user to has nothing to answer.
+     */
+    suspend fun setSelfAttendeeStatus(eventId: Long, status: AttendeeStatus): Boolean
+
     /** How many events sit on [calendarId]. Shown before offering to delete it. */
     suspend fun countEvents(calendarId: Long): Int
 
@@ -460,6 +473,67 @@ class CalendarContractRepository @Inject constructor(
         arrayOf(CalendarContract.ACCOUNT_TYPE_LOCAL, LOCAL_ACCOUNT_NAME),
         "${CalendarContract.Calendars._ID} ASC",
     )?.use { c -> if (c.moveToFirst()) c.getLong(0) else null }
+
+    override suspend fun setSelfAttendeeStatus(eventId: Long, status: AttendeeStatus): Boolean =
+        withContext(Dispatchers.IO) {
+            val owner = selfAddressFor(eventId) ?: return@withContext false
+            val values = ContentValues().apply {
+                put(CalendarContract.Attendees.ATTENDEE_STATUS, status.toProviderStatus())
+            }
+            val updated = safeUpdate(
+                CalendarContract.Attendees.CONTENT_URI,
+                values,
+                "${CalendarContract.Attendees.EVENT_ID} = ? AND " +
+                    "${CalendarContract.Attendees.ATTENDEE_EMAIL} = ?",
+                arrayOf(eventId.toString(), owner),
+            )
+            if (updated == 0) return@withContext false
+            // The event's own copy of the answer. Sync adapters and other calendar apps read this
+            // rather than joining to the attendee table, so leaving it behind would show the reply
+            // on this screen and nowhere else.
+            safeUpdate(
+                ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId),
+                ContentValues().apply {
+                    put(CalendarContract.Events.SELF_ATTENDEE_STATUS, status.toProviderStatus())
+                },
+                null,
+                null,
+            )
+            true
+        }
+
+    /** The address the user is known by on the calendar [eventId] lives on. */
+    private fun selfAddressFor(eventId: Long): String? {
+        val calendarId = safeQuery(
+            ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId),
+            arrayOf(CalendarContract.Events.CALENDAR_ID),
+            null,
+            null,
+            null,
+        )?.use { c -> if (c.moveToFirst()) c.getLong(0) else null } ?: return null
+        return safeQuery(
+            ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, calendarId),
+            arrayOf(
+                CalendarContract.Calendars.OWNER_ACCOUNT,
+                CalendarContract.Calendars.ACCOUNT_NAME,
+            ),
+            null,
+            null,
+            null,
+        )?.use { c ->
+            if (!c.moveToFirst()) return@use null
+            // OWNER_ACCOUNT is the address the server knows; ACCOUNT_NAME is the fallback for the
+            // providers that leave it empty, where the two are the same thing anyway.
+            c.getString(0)?.takeIf { it.isNotBlank() } ?: c.getString(1)?.takeIf { it.isNotBlank() }
+        }
+    }
+
+    private fun AttendeeStatus.toProviderStatus(): Int = when (this) {
+        AttendeeStatus.ACCEPTED -> CalendarContract.Attendees.ATTENDEE_STATUS_ACCEPTED
+        AttendeeStatus.DECLINED -> CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED
+        AttendeeStatus.TENTATIVE -> CalendarContract.Attendees.ATTENDEE_STATUS_TENTATIVE
+        AttendeeStatus.INVITED -> CalendarContract.Attendees.ATTENDEE_STATUS_INVITED
+    }
 
     override suspend fun updateLocalCalendar(calendarId: Long, name: String, color: Int): Boolean =
         withContext(Dispatchers.IO) {

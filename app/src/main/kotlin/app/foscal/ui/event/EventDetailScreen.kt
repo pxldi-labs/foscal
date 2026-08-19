@@ -43,6 +43,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -144,6 +145,8 @@ fun EventDetailScreen(
                                 calendarName = state.calendar?.displayName ?: "Calendar",
                                 reminderMinutes = state.reminderMinutes,
                                 attendees = state.attendees,
+                                reply = state.selfAttendee?.status.takeIf { state.canReply },
+                                onReply = viewModel::reply,
                                 mapsEnabled = state.mapsEnabled,
                                 onOpenLocationMap = onOpenLocationMap,
                                 onEdit = { onEdit(eventId, current.start.toEpochMilli()) },
@@ -186,6 +189,9 @@ private fun DetailContent(
     calendarName: String,
     reminderMinutes: List<Int>,
     attendees: List<Attendee>,
+    /** The user's current answer, or null when this is not an invitation they can answer. */
+    reply: AttendeeStatus?,
+    onReply: (AttendeeStatus) -> Unit,
     mapsEnabled: Boolean,
     onOpenLocationMap: (location: String) -> Unit,
     onEdit: () -> Unit,
@@ -268,6 +274,9 @@ private fun DetailContent(
             Spacer(Modifier.size(10.dp))
             Text("Edit event", fontWeight = FontWeight.SemiBold)
         }
+        if (reply != null) {
+            ReplyRow(current = reply, onReply = onReply)
+        }
         if (attendees.isNotEmpty()) {
             GuestsCard(attendees = attendees, onEmail = { openMail(context, it) })
         }
@@ -281,6 +290,41 @@ private fun DetailContent(
  * (that is the sync adapter's and the server's job), so passing the address to whatever mail app the
  * user already has is the honest affordance rather than a Yes/No pair that would go nowhere.
  */
+/**
+ * Yes / Maybe / No for an invitation.
+ *
+ * Three buttons rather than a menu because the answer is the reason the screen was opened, and a
+ * reply is worth exactly one tap. The current answer is filled in rather than merely marked, so a
+ * glance says which one it is without reading all three.
+ */
+@Composable
+private fun ReplyRow(current: AttendeeStatus, onReply: (AttendeeStatus) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "Going?",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                AttendeeStatus.ACCEPTED to "Yes",
+                AttendeeStatus.TENTATIVE to "Maybe",
+                AttendeeStatus.DECLINED to "No",
+            ).forEach { (status, label) ->
+                FilterChip(
+                    selected = current == status,
+                    onClick = { onReply(status) },
+                    label = { Text(label) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun GuestsCard(attendees: List<Attendee>, onEmail: (String) -> Unit) {
     Card(
