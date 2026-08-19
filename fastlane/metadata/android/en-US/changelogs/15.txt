@@ -1,0 +1,8 @@
+0.13.0
+
+* Guests: see who is on an event, and reply Yes, Maybe or No to an invitation.
+* A join button for a video call linked in an event's notes or location.
+* Give an event a colour of its own, or leave it on its calendar's.
+* Keep a calendar out of the month grid while it still shows everywhere else.
+* Skip short events in the month grid.
+* Snooze a reminder from its notification.
