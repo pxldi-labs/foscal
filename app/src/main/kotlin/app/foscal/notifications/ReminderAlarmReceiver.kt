@@ -152,7 +152,7 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
             .setContentIntent(tapPi)
             .addAction(
-                R.drawable.ic_notification_calendar,
+                R.drawable.ic_notification_snooze,
                 "Snooze ${SnoozeMinutes}m",
                 snoozePendingIntent(context, key, eventId, title, whenMillis, location, minutes, allDay),
             )

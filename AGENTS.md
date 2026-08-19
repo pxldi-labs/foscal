@@ -209,7 +209,8 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   `ic_foscal_badge.xml`). Keep them in sync if you change one, and redraw
   `ic_launcher_monochrome.xml` alongside — the themed-icon layer is a silhouette, so
   the grid has to be punched out with `fillType="evenOdd"` rather than drawn in a
-  second colour. Brand palette: ink `#101C36`, card `#A8CBFF`, band `#FFC963`,
+  second colour. `ic_notification_calendar.xml` is the same mark again but simplified
+  to one row of three under a band: at 24dp the full grid closes into a smear. Brand palette: ground `#FFFFFF`, card `#1B3A6B`, band `#F2A93C`,
   tab `#2B4FA8`. These are the mark's own colours and are deliberately separate from
   the Material scheme in `:core-ui` and from the per-calendar colours in
   `ui/CalendarColors.kt`.
