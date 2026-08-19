@@ -11,6 +11,7 @@ import java.time.DayOfWeek
 class FakePreferences(
     onboardingDone: Boolean = true,
     hidden: Set<String> = emptySet(),
+    monthHidden: Set<String> = emptySet(),
     private val defaultReminder: Int? = 15,
     calendarReminders: Map<Long, Int?> = emptyMap(),
     accent: AccentColor = AccentColor.COBALT,
@@ -23,6 +24,7 @@ class FakePreferences(
 
     override val onboardingCompleted: Flow<Boolean> = MutableStateFlow(onboardingDone)
     override val hiddenCalendarIds: Flow<Set<String>> = MutableStateFlow(hidden)
+    override val monthHiddenCalendarIds: Flow<Set<String>> = MutableStateFlow(monthHidden)
     override val defaultReminderMinutes: Flow<Int?> = MutableStateFlow(defaultReminder)
     override val calendarReminderDefaults: MutableStateFlow<Map<Long, Int?>> =
         MutableStateFlow(calendarReminders)
@@ -54,6 +56,7 @@ class FakePreferences(
 
     override suspend fun setOnboardingCompleted() = Unit
     override suspend fun setHiddenCalendars(ids: Set<String>) = Unit
+    override suspend fun setMonthHiddenCalendars(ids: Set<String>) = Unit
     override suspend fun setDefaultReminder(minutes: Int?) = Unit
 
     override suspend fun setCalendarReminderDefault(calendarId: Long, minutes: Int?) {

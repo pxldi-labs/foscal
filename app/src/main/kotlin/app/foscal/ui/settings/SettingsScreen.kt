@@ -321,6 +321,7 @@ private fun LazyListScope.calendarsSection(
             expanded = expandedCalendarId == row.calendar.id,
             onExpand = { onExpand(row.calendar.id) },
             onToggleHidden = { viewModel.toggleHidden(row) },
+            onToggleHiddenInMonth = { viewModel.toggleHiddenInMonth(row) },
             onEdit = { onEditCalendar(row.calendar) },
             onDelete = { onDeleteCalendar(row.calendar) },
             onSelectReminder = { selection ->
@@ -423,6 +424,7 @@ private fun CalendarRowCard(
     expanded: Boolean,
     onExpand: () -> Unit,
     onToggleHidden: () -> Unit,
+    onToggleHiddenInMonth: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSelectReminder: (ReminderSelection) -> Unit,
@@ -479,6 +481,33 @@ private fun CalendarRowCard(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !row.isHidden, onClick = onToggleHiddenInMonth)
+                            .padding(top = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Show in Month", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "Off keeps it in Day, Week and Agenda. A month cell is a few " +
+                                    "millimetres tall, so a calendar you fill in blocks crowds " +
+                                    "out the appointments worth seeing there.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = !row.isHiddenInMonth,
+                            onCheckedChange = { onToggleHiddenInMonth() },
+                            // A calendar switched off everywhere is not in Month either, and a
+                            // live switch here would claim otherwise.
+                            enabled = !row.isHidden,
+                        )
+                    }
                     HorizontalDivider()
                     Text(
                         "Reminder for new events here",

@@ -7,7 +7,7 @@ import app.foscal.core.data.Preferences
 import app.foscal.core.model.Event
 import app.foscal.ui.util.DayWindow
 import app.foscal.ui.util.Dates
-import app.foscal.ui.util.visibleCalendarIds
+import app.foscal.ui.util.monthCalendarIds
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +47,7 @@ class MonthViewModel @Inject constructor(
     private val zone: ZoneId = ZoneId.systemDefault()
     private val today = Dates.todayFlow(zone)
 
-    private val calendarIds = visibleCalendarIds(repository, prefs)
+    private val calendarIds = monthCalendarIds(repository, prefs)
 
     /**
      * The loaded range, which deliberately does not follow the visible month. Paging inside it

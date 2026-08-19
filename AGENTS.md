@@ -178,6 +178,12 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   with the rest of the UI whenever the user has forced Light or Dark in Settings. The only
   legitimate callers of `isSystemInDarkTheme()` are `MainActivity`, where `ThemeMode.SYSTEM`
   is resolved into the `darkTheme` argument, and that parameter's own default.
+- **Which calendars a view draws** — `visibleCalendarIds(repository, prefs)` in
+  `ui/util/VisibleCalendars.kt` is the one source, intersecting the provider's `Calendars.VISIBLE`
+  with the user's own toggle. Month uses `monthCalendarIds`, which layers a second, month-only
+  exclusion on top. Layered, never folded in: the month setting can only ever remove, so a
+  calendar switched off everywhere cannot be brought back by it. Add a new view's filtering here
+  rather than in the view model — the four copies this replaced had already begun to drift.
 - **Editing and deleting a calendar** — only ones on the app's own local account, guarded both in
   the UI (`CalendarRowCard` shows both buttons only when `calendar.isLocal`) and again in
   `CalendarRepository.updateLocalCalendar` / `deleteLocalCalendar`. A rename writes `NAME` as well

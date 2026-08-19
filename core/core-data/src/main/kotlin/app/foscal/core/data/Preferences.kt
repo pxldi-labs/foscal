@@ -13,6 +13,16 @@ import java.time.DayOfWeek
 interface Preferences {
     val onboardingCompleted: Flow<Boolean>
     val hiddenCalendarIds: Flow<Set<String>>
+
+    /**
+     * Calendars kept out of the month grid while still showing everywhere else.
+     *
+     * Separate from [hiddenCalendarIds] rather than folded into it because they answer different
+     * questions: that one is "do I want this calendar at all", this one is "does it belong in a
+     * view where a day is a few millimetres tall". A timeboxed week fills a month grid with
+     * blocks that say nothing at that size and crowd out the appointments that do.
+     */
+    val monthHiddenCalendarIds: Flow<Set<String>>
     /**
      * Minutes before start to pre-fill on a new event, or null when the user picked "None".
      *
@@ -88,6 +98,8 @@ interface Preferences {
 
     suspend fun setOnboardingCompleted()
     suspend fun setHiddenCalendars(ids: Set<String>)
+
+    suspend fun setMonthHiddenCalendars(ids: Set<String>)
     suspend fun setDefaultReminder(minutes: Int?)
 
     /** Overrides the default for one calendar; [minutes] of null means "None on this calendar". */

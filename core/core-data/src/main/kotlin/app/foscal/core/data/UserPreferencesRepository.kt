@@ -32,6 +32,9 @@ class UserPreferencesRepository @Inject constructor(
     override val hiddenCalendarIds: Flow<Set<String>> =
         context.dataStore.data.map { it[HIDDEN_CALENDARS] ?: emptySet() }
 
+    override val monthHiddenCalendarIds: Flow<Set<String>> =
+        context.dataStore.data.map { it[MONTH_HIDDEN_CALENDARS] ?: emptySet() }
+
     // An absent key is a fresh install and resolves to the built-in default; only the sentinel
     // means "None", so null reaching a caller is always a deliberate choice to have no reminder.
     override val defaultReminderMinutes: Flow<Int?> =
@@ -105,6 +108,10 @@ class UserPreferencesRepository @Inject constructor(
 
     override suspend fun setHiddenCalendars(ids: Set<String>) {
         context.dataStore.edit { prefs -> prefs[HIDDEN_CALENDARS] = ids }
+    }
+
+    override suspend fun setMonthHiddenCalendars(ids: Set<String>) {
+        context.dataStore.edit { prefs -> prefs[MONTH_HIDDEN_CALENDARS] = ids }
     }
 
     override suspend fun setDefaultReminder(minutes: Int?) {
@@ -185,6 +192,7 @@ class UserPreferencesRepository @Inject constructor(
 
         private val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         private val HIDDEN_CALENDARS = stringSetPreferencesKey("hidden_calendars")
+        private val MONTH_HIDDEN_CALENDARS = stringSetPreferencesKey("month_hidden_calendars")
         private val DEFAULT_REMINDER = intPreferencesKey("default_reminder_minutes")
         private val CALENDAR_REMINDERS = stringSetPreferencesKey("calendar_reminder_defaults")
         private val ACCENT_COLOR = stringPreferencesKey("accent_color")
