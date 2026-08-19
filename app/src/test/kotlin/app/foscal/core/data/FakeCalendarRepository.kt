@@ -128,6 +128,11 @@ class FakeCalendarRepository(
     /** Names handed to [createLocalCalendar], in order. */
     val createdCalendars = mutableListOf<Pair<String, Int>>()
 
+    /** What [getEventColor] should answer, per event id. */
+    val eventColors = mutableMapOf<Long, Int>()
+
+    override suspend fun getEventColor(eventId: Long): Int? = eventColors[eventId]
+
     /** Replies handed to [setSelfAttendeeStatus], in order. */
     val replies = mutableListOf<Pair<Long, AttendeeStatus>>()
 

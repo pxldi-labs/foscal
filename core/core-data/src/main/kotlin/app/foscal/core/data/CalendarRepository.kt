@@ -124,6 +124,15 @@ interface CalendarRepository {
      */
     suspend fun setSelfAttendeeStatus(eventId: Long, status: AttendeeStatus): Boolean
 
+    /**
+     * The colour set on this one event, or null when it simply follows its calendar's.
+     *
+     * A separate read rather than another column on the shared projections: the editor is the only
+     * caller that needs to tell "its own colour" from "the calendar's", because everywhere else
+     * already gets the resolved answer from `DISPLAY_COLOR`.
+     */
+    suspend fun getEventColor(eventId: Long): Int?
+
     /** How many events sit on [calendarId]. Shown before offering to delete it. */
     suspend fun countEvents(calendarId: Long): Int
 
@@ -474,6 +483,18 @@ class CalendarContractRepository @Inject constructor(
         "${CalendarContract.Calendars._ID} ASC",
     )?.use { c -> if (c.moveToFirst()) c.getLong(0) else null }
 
+    override suspend fun getEventColor(eventId: Long): Int? = withContext(Dispatchers.IO) {
+        safeQuery(
+            ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId),
+            arrayOf(CalendarContract.Events.EVENT_COLOR),
+            null,
+            null,
+            null,
+        )?.use { c ->
+            if (c.moveToFirst() && !c.isNull(0)) c.getInt(0).takeIf { it != 0 } else null
+        }
+    }
+
     override suspend fun setSelfAttendeeStatus(eventId: Long, status: AttendeeStatus): Boolean =
         withContext(Dispatchers.IO) {
             val owner = selfAddressFor(eventId) ?: return@withContext false
@@ -708,6 +729,11 @@ class CalendarContractRepository @Inject constructor(
             put(CalendarContract.Events.ALL_DAY, if (input.allDay) 1 else 0)
             put(CalendarContract.Events.EVENT_TIMEZONE, input.timezone)
             put(CalendarContract.Events.DTSTART, input.start.toEpochMilli())
+            if (input.color != null) {
+                put(CalendarContract.Events.EVENT_COLOR, input.color)
+            } else {
+                putNull(CalendarContract.Events.EVENT_COLOR)
+            }
             put(
                 CalendarContract.Events.DURATION,
                 formatDuration(input.start, input.end, input.allDay),
@@ -1303,6 +1329,13 @@ class CalendarContractRepository @Inject constructor(
         put(CalendarContract.Events.ALL_DAY, if (input.allDay) 1 else 0)
         put(CalendarContract.Events.EVENT_TIMEZONE, input.timezone)
         put(CalendarContract.Events.DTSTART, input.start.toEpochMilli())
+        // Null rather than omitted: an event that had its own colour and has been put back on the
+        // calendar's has to clear the column, and leaving it out would silently keep the old one.
+        if (input.color != null) {
+            put(CalendarContract.Events.EVENT_COLOR, input.color)
+        } else {
+            putNull(CalendarContract.Events.EVENT_COLOR)
+        }
 
         if (input.frequency == Frequency.NONE) {
             // Non-recurring: provider requires DTEND (or DURATION), forbids RRULE.

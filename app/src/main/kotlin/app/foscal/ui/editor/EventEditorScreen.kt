@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -68,6 +69,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -79,7 +83,9 @@ import app.foscal.core.model.Attendee
 import app.foscal.core.model.Frequency
 import app.foscal.core.model.ReminderDuration
 import app.foscal.core.ui.theme.Motion
+import app.foscal.ui.CalendarColors
 import app.foscal.ui.common.ReminderDurationDialog
+import app.foscal.ui.contrastColor
 import app.foscal.ui.util.LocalUse24HourClock
 import app.foscal.ui.util.currentLocale
 import app.foscal.ui.util.rememberDateFormatter
@@ -293,6 +299,18 @@ private fun EditorForm(
                     }
                 }
             }
+        }
+
+        // Colour — its own, or the calendar's.
+        Section {
+            ColorRow(
+                selected = state.color,
+                calendarColor = state.availableCalendars
+                    .firstOrNull { it.id == state.selectedCalendarId }
+                    ?.color,
+                onSelect = viewModel::updateColor,
+                modifier = rowPadding.fillMaxWidth(),
+            )
         }
 
         // Reminder
@@ -605,6 +623,75 @@ private fun ChipRow(
 private val ReminderPresets = listOf(0, 5, 15, 30, 60, 1440)
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/**
+ * A colour for this one event, or the calendar's.
+ *
+ * The calendar's own colour leads and is what an event gets by default, because most events want
+ * it: colouring by calendar is what makes a week readable at a glance, and an event that opts out
+ * is saying something specific. The provider takes a free colour from an ordinary app, so the
+ * swatches are the app's own palette rather than an account's — a sync adapter may still snap it
+ * to whatever its server understands.
+ */
+@Composable
+private fun ColorRow(
+    selected: Int?,
+    calendarColor: Int?,
+    onSelect: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Colour", style = MaterialTheme.typography.bodyLarge)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            calendarColor?.let {
+                EventColorSwatch(
+                    colorArgb = it,
+                    selected = selected == null,
+                    contentDescription = "The calendar's colour",
+                    onClick = { onSelect(null) },
+                )
+            }
+            CalendarColors.presets.forEach { swatch ->
+                EventColorSwatch(
+                    colorArgb = swatch,
+                    selected = selected == swatch,
+                    contentDescription = null,
+                    onClick = { onSelect(swatch) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EventColorSwatch(
+    colorArgb: Int,
+    selected: Boolean,
+    contentDescription: String?,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(Color(colorArgb))
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .semantics { contentDescription?.let { this.contentDescription = it } },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = null,
+                tint = contrastColor(colorArgb),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun ReminderRow(
     selected: List<Int>,

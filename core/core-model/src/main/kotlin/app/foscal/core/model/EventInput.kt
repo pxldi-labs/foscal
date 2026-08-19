@@ -58,4 +58,14 @@ data class EventInput(
      * that actually loaded the guests may pass a list, empty or not.
      */
     val attendees: List<Attendee>? = null,
+    /**
+     * A colour for this one event, or null to follow its calendar's.
+     *
+     * Written straight to `EVENT_COLOR`, which the provider takes from an ordinary app and which
+     * `Instances.DISPLAY_COLOR` already prefers over the calendar's — so nothing downstream has to
+     * know this exists. What a *sync adapter* then does with it is its own business: CalDAV has a
+     * per-event COLOR (RFC 7986) that not every server or client round-trips, and palette-based
+     * accounts may snap it to their nearest swatch or drop it.
+     */
+    val color: Int? = null,
 )

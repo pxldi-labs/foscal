@@ -82,6 +82,8 @@ data class EditorUiState(
     val attendees: List<Attendee> = emptyList(),
     /** What the user has typed into the "Add guest" field, before it is committed as a chip. */
     val guestDraft: String = "",
+    /** A colour for this one event, or null to follow its calendar's. */
+    val color: Int? = null,
     /**
      * The `EVENT_TIMEZONE` of the event being edited, or null for a new one. Preserved on save so
      * editing an event authored in another zone (CalDAV, travel) does not re-anchor it to the
@@ -230,6 +232,7 @@ class EventEditorViewModel @Inject constructor(
                         showCustomRecurrence = spec.isCustom,
                         reminderMinutes = reminders.distinct().sorted(),
                         attendees = attendees,
+                        color = repository.getEventColor(eventId),
                         originalTimezone = event.timezone,
                     )
                     return@launch
@@ -278,6 +281,9 @@ class EventEditorViewModel @Inject constructor(
             .withMinute(0)
             .withSecond(0)
             .withNano(0)
+
+    /** [color] of null puts the event back on its calendar's colour. */
+    fun updateColor(color: Int?) = mutate { it.copy(color = color) }
 
     fun updateTitle(value: String) = mutate { it.copy(title = value) }
     fun updateLocation(value: String) = mutate { it.copy(location = value) }
@@ -461,6 +467,7 @@ class EventEditorViewModel @Inject constructor(
                 // an event the user did not organize, null instead: writing the list back even
                 // unchanged re-sends it to the server, and it is not ours to re-send.
                 attendees = current.attendees.takeIf { current.canEditGuests },
+                color = current.color,
             )
             when {
                 !current.isEditing -> repository.createEvent(input)
