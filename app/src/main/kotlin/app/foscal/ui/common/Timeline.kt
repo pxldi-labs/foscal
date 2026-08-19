@@ -105,6 +105,15 @@ val TimelineEndInset = 4.dp
  */
 private const val SnapMinutes = 10
 
+/**
+ * What a *tap* snaps to, which is not the same thing.
+ *
+ * A drag is someone drawing a block and saying exactly how long it is; a tap is someone pointing
+ * at a part of the day and letting the app pick. Nobody points at ten past. The hour is what "here"
+ * means when you have not said otherwise.
+ */
+private const val TapSnapMinutes = 60
+
 /** Grid hour to open on when no timed event and no "now" marker gives a better anchor. */
 private const val DEFAULT_ANCHOR_HOUR = 8
 
@@ -191,9 +200,9 @@ fun TimelineLayout(
     // them. A solid outline colour turns the grid into the loudest thing on an empty day. Ink in
     // light, white in dark — a dark grey line on a dark background reads as dirt.
     val hourLineColor = if (LocalIsDarkTheme.current) {
-        Color.White.copy(alpha = 0.10f)
+        Color.White.copy(alpha = 0.17f)
     } else {
-        Color.Black.copy(alpha = 0.06f)
+        Color.Black.copy(alpha = 0.11f)
     }
     val nowColor = MaterialTheme.colorScheme.error
     val todayTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
@@ -354,7 +363,7 @@ fun TimelineLayout(
                                                     val latest = (24 * 60 - newEventMinutes).coerceAtLeast(0)
                                                     placement = NewEventPlacement(
                                                         day.date,
-                                                        raw.floorToStep(SnapMinutes).coerceIn(0, latest),
+                                                        raw.floorToStep(TapSnapMinutes).coerceIn(0, latest),
                                                     )
                                                 },
                                             )

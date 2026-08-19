@@ -24,6 +24,14 @@ class TimelineSelectionTest {
     }
 
     @Test
+    fun `a tap lands on the hour, wherever in it the finger was`() {
+        assertEquals(540, 540.floorToStep(60))
+        assertEquals(540, 559.floorToStep(60))
+        assertEquals(540, 599.floorToStep(60))
+        assertEquals(600, 600.floorToStep(60))
+    }
+
+    @Test
     fun `a drag downwards is the range it covers`() {
         val span = TimeSelection(day, startMinute = 540, endMinute = 610).span(60)
         assertEquals(540, span.first)
