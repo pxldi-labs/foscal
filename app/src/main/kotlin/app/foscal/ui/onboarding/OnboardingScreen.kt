@@ -80,7 +80,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import androidx.core.content.ContextCompat
 
-private enum class OnboardingStep { WELCOME, PREPARING, CALENDARS, NOTIFICATIONS }
+private enum class OnboardingStep { WELCOME, PREPARING, CALENDARS, SETTLING, NOTIFICATIONS }
 
 /**
  * How long the setup screen holds before showing what it found.
@@ -93,6 +93,9 @@ private enum class OnboardingStep { WELCOME, PREPARING, CALENDARS, NOTIFICATIONS
  * looked up, and short enough that nobody is kept waiting for it.
  */
 private const val PreparingMillis = 800L
+
+/** The same beat after the calendar choice, before the last step. */
+private const val SettlingMillis = 1100L
 
 @Composable
 fun OnboardingRoute(
@@ -128,14 +131,24 @@ fun OnboardingRoute(
     }
 
     LaunchedEffect(step) {
-        if (step == OnboardingStep.PREPARING) {
-            delay(PreparingMillis)
-            step = OnboardingStep.CALENDARS
+        when (step) {
+            OnboardingStep.PREPARING -> {
+                delay(PreparingMillis)
+                step = OnboardingStep.CALENDARS
+            }
+            // Choosing a calendar can finish instantly — picking one that already exists writes
+            // nothing at all — and a screen that vanishes the moment it is touched reads as a
+            // misfire rather than as having worked. The beat is what makes the choice land.
+            OnboardingStep.SETTLING -> {
+                delay(SettlingMillis)
+                step = OnboardingStep.NOTIFICATIONS
+            }
+            else -> Unit
         }
     }
 
     LaunchedEffect(state.setupComplete) {
-        if (state.setupComplete) step = OnboardingStep.NOTIFICATIONS
+        if (state.setupComplete) step = OnboardingStep.SETTLING
     }
 
     LaunchedEffect(state.finished) {
@@ -163,6 +176,7 @@ fun OnboardingRoute(
                     // progress bar that moves only once the waiting is over is not progress.
                     OnboardingStep.PREPARING -> 1
                     OnboardingStep.CALENDARS -> 1
+                    OnboardingStep.SETTLING -> 2
                     OnboardingStep.NOTIFICATIONS -> 2
                 },
             )
@@ -234,7 +248,8 @@ fun OnboardingRoute(
                         onMapsToggle = viewModel::setMapsEnabled,
                         onDone = viewModel::completeOnboarding,
                     )
-                    OnboardingStep.PREPARING -> PreparingStep()
+                    OnboardingStep.PREPARING -> PreparingStep("Checking what's on this phone\u2026")
+                    OnboardingStep.SETTLING -> PreparingStep("Setting your calendar up\u2026")
                 }
             }
 
@@ -265,9 +280,9 @@ fun OnboardingRoute(
     }
 }
 
-/** Held for [PreparingMillis] between granting access and being shown what was found. */
+/** The waiting beat, held for [PreparingMillis] or [SettlingMillis] depending on which one. */
 @Composable
-private fun PreparingStep() {
+private fun PreparingStep(message: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -277,7 +292,7 @@ private fun PreparingStep() {
     ) {
         CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
         Text(
-            "Checking what's on this phone\u2026",
+            message,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -316,14 +331,7 @@ private fun WelcomeStep(onStart: () -> Unit) {
         FoscalMark(Modifier.size(104.dp))
         Spacer(Modifier.height(30.dp))
         FoscalWordmark()
-        Text(
-            "A calendar that stays out of your way.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 14.dp),
-        )
-        Spacer(Modifier.height(140.dp))
+        Spacer(Modifier.height(154.dp))
         Button(
             onClick = onStart,
             modifier = Modifier
@@ -333,12 +341,6 @@ private fun WelcomeStep(onStart: () -> Unit) {
         ) {
             Text("Get started", fontWeight = FontWeight.SemiBold)
         }
-        Text(
-            "No account needed",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 14.dp),
-        )
     }
 }
 
@@ -417,7 +419,7 @@ private fun PersonalizeStep(
             modifier = Modifier.padding(top = 18.dp),
         )
         Text(
-            "All of this is in Settings too.",
+            "You can change these settings later.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
