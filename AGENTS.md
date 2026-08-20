@@ -389,11 +389,18 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   gets fainter as the screen gets better. The hour grid shipped that way for months and read as
   "too subtle" rather than as a bug. Always write `SomeWidth.dp.toPx()`; the named widths for the
   grid live at the top of `Timeline.kt`.
-- **Hour labels are centred on their line, not hung off the top of the hour.** They name a line, so
-  they straddle it: each sits in a `HourLabelHeight` box offset up by half of it. Midnight is
-  deliberately unlabelled, because half of "00:00" would fall above the top edge of the grid. The
-  "now" label in the gutter uses the same rule so the two stay comparable, and
-  `NowLabelClearance` is what keeps them from printing over each other.
+- **Hour labels are centred on their line by *baseline*, not by their box.** A line of text is not
+  vertically symmetrical — the box around it carries descender room the digits never use — so
+  centring the box leaves the digits sitting visibly high, and a fixed-height box also clips any
+  face whose line box is taller than it (Manrope's is 1.37 em, which is what broke the first
+  attempt). `Modifier.centredOnHourLine()` measures the text's own `FirstBaseline` and lifts it by
+  half a cap height. Midnight is deliberately unlabelled, because half of "00:00" would fall above
+  the top edge of the grid, and the "now" label uses the same rule so the two stay comparable;
+  `NowLabelClearance` keeps them from printing over each other.
+- **The gutter's type size is capped in dp (`HourLabelMaxSize`).** `TimelineGutterWidth` is fixed
+  and every column is measured off it, so at a large system font scale "16:00" wraps and the ruler
+  becomes a stack of broken times. The cap is a width constraint expressed as type, not an opinion
+  about accessibility — the rest of the app scales normally.
 - **A null `Preferences.defaultReminderMinutes` means "None", not "unset".** DataStore cannot hold
   a null Int, so the stored sentinel is `-1`; the flow resolves an *absent* key to the built-in
   15-minute default itself. A caller writing `?: 15` therefore re-adds the exact alarm the user
