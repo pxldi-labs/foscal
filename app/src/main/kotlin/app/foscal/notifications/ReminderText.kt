@@ -7,31 +7,27 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Inside this, a reminder says how long you have. Outside it, it says when the thing is. */
-private const val RelativeWindowMinutes = 60L
-
 /** Beyond a week out, the weekday alone stops being enough to place a date. */
 private const val NamedWeekdayDays = 7L
 
 /**
  * When the event is, in one phrase.
  *
- * Reminders used to print the lead time, the date and the clock time side by side — "In 15m · Tue,
- * Aug 19 · 11:30" — which is the same fact three times and reads as none of them. Only one of those
- * is ever the useful one, and which one depends entirely on how far away the event is.
+ * The clock time, the way every other calendar's reminders do it: "21:30 – 22:00" is the fact you
+ * act on, and it stays true however late the alarm arrives. The lead time was tried here first and
+ * read badly at exactly the moment it mattered — a reminder that says "Now" tells you nothing you
+ * did not already know from your phone buzzing.
  *
- * Close to the event, the lead time is what you act on: "In 15 min" answers whether to get up now,
- * and the notification's own timestamp already carries the clock time beside it. Far from it, the
- * lead time is the useless one — "in 2 weeks" tells you nothing you can put in a week — so it gives
- * the day instead, named while a weekday still identifies it and dated once it no longer does.
+ * The day is named only when the event is not today, because a reminder that fires for something
+ * hours away should say which day it means; a same-day one would just be repeating itself.
  *
- * [startMillis] is when the event begins as the reader understands it: local midnight for an
- * all-day event, not the UTC midnight the provider stores. Measured against [nowMillis] rather
- * than the reminder's configured offset, so an alarm held back by Doze admits how late it is
- * instead of insisting it is fifteen minutes early.
+ * [startMillis] and [endMillis] are when the event runs as the reader understands it: local
+ * midnight for an all-day event, not the UTC midnight the provider stores. [nowMillis] decides
+ * only whether the day needs naming.
  */
 internal fun reminderWhen(
     startMillis: Long,
+    endMillis: Long,
     nowMillis: Long,
     allDay: Boolean,
     use24Hour: Boolean,
@@ -41,22 +37,19 @@ internal fun reminderWhen(
     if (startMillis <= 0L) return null
     val start = Instant.ofEpochMilli(startMillis).atZone(zone)
     val now = Instant.ofEpochMilli(nowMillis).atZone(zone)
-    val minutes = Math.round((startMillis - nowMillis) / 60_000.0)
-
-    if (!allDay && minutes > -RelativeWindowMinutes && minutes < RelativeWindowMinutes) {
-        return when {
-            minutes > 0L -> "In $minutes min"
-            minutes == 0L -> "Now"
-            else -> "${-minutes} min ago"
-        }
-    }
-
     val day = dayLabel(start.toLocalDate(), now.toLocalDate(), locale)
     if (allDay) return day
-    val time = start.format(
-        DateTimeFormatter.ofPattern(if (use24Hour) "HH:mm" else "h:mm a", locale),
-    )
-    return "$day at $time"
+
+    val format = DateTimeFormatter.ofPattern(if (use24Hour) "HH:mm" else "h:mm a", locale)
+    val from = start.format(format)
+    // An end the provider could not supply is left off rather than guessed at; the start alone is
+    // still the answer to "when", just less of it.
+    val span = if (endMillis > startMillis) {
+        "$from \u2013 ${Instant.ofEpochMilli(endMillis).atZone(zone).format(format)}"
+    } else {
+        from
+    }
+    return if (start.toLocalDate() == now.toLocalDate()) span else "$day, $span"
 }
 
 private fun dayLabel(date: LocalDate, today: LocalDate, locale: Locale): String {
