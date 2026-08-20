@@ -1,5 +1,7 @@
 package app.foscal.ui.settings
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.ManagedActivityResultLauncher
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,11 +77,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.BuildConfig
@@ -413,9 +418,10 @@ private fun LazyListScope.remindersSection(
 
 @Composable
 private fun AboutSection() {
+    val context = LocalContext.current
     Column(
         modifier = Modifier.padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // The mark, at the size a launcher icon actually is. About is the one page in the app
         // that is about the app rather than about the calendar, and a version number on its own
@@ -427,20 +433,79 @@ private fun AboutSection() {
                 .padding(bottom = 6.dp)
                 .size(64.dp),
         )
-        Text("Foscal ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
+        Text("Foscal ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleLarge)
         Text(
-            "Foscal doesn't sync by itself. DAVx\u2075 or your account app keeps calendars current.",
-            style = MaterialTheme.typography.bodySmall,
+            "A calendar that keeps to itself. Your events stay in the calendars this phone " +
+                "already has \u2014 there is no account to make, and nothing leaves the device.",
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        // The Open Font License asks that the fonts be credited where the app credits anything,
-        // and its full text ships beside them in the APK's assets.
         Text(
-            "Set in Gabarito and Manrope, both under the SIL Open Font License 1.1.",
-            style = MaterialTheme.typography.bodySmall,
+            "Foscal does not sync on its own. DAVx\u2075, or whichever app owns your account, " +
+                "keeps those calendars up to date; Foscal shows you what they leave behind.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(6.dp))
+
+        // The repository, reachable rather than merely mentioned: this is the one screen where
+        // "open source" should be somewhere you can go, not an adjective.
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { openUrl(context, REPO_URL) }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_github),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(26.dp),
+            )
+            Column {
+                Text(
+                    "Free and open source software",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    REPO_LABEL,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // The Open Font License asks that the fonts be named wherever the app names anything, and
+        // its full text ships beside them in the APK's assets.
+        Text(
+            "Using fonts",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            "Gabarito and Manrope, both under the SIL Open Font License 1.1.",
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+private const val REPO_URL = "https://github.com/pxldi-labs/foscal"
+private const val REPO_LABEL = "github.com/pxldi-labs/foscal"
+
+/**
+ * `resolveActivity` is deliberately not consulted first: package visibility on API 30+ hides
+ * browsers this app has no `<queries>` entry for, so the check reports "nothing can open this"
+ * for links that in fact open fine. Catching the failure covers the genuinely empty case.
+ */
+private fun openUrl(context: Context, url: String) {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
 }
 
 @Composable
