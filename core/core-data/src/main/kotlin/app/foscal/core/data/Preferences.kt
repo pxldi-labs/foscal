@@ -92,6 +92,45 @@ interface Preferences {
     /** Whether the month grid shows ISO week numbers down its left edge. */
     val showWeekNumbers: Flow<Boolean>
 
+    /**
+     * The reminder a new **all-day** event starts with, in minutes before local midnight of the
+     * day it falls on. Null means none.
+     *
+     * Separate from [defaultReminderMinutes] because the two are not the same question. "15
+     * minutes before" is a sensible answer for a meeting and a useless one for a birthday: it
+     * fires at 23:45 the night before, which is neither a warning nor a reminder. All-day events
+     * are answered in hours before midnight, so 900 is 09:00 the previous morning.
+     */
+    val allDayReminderMinutes: Flow<Int?>
+
+    /**
+     * Whether an event the user has declined still appears on the grid.
+     *
+     * Off by default: a meeting you said no to is one you are not going to, and leaving it in
+     * place makes a free afternoon look busy. It is still reachable through search, and the event
+     * itself is untouched — this hides it, it does not delete it.
+     */
+    val showDeclinedEvents: Flow<Boolean>
+
+    /** How many events the agenda widget lists per day before it stops. */
+    val widgetEventLimit: Flow<Int>
+
+    /**
+     * Whether the widget's rows carry the end time and the location as well as the start.
+     *
+     * On by default, which is what the widget has always done. Turning it off leaves the start
+     * time alone on the second line, which is the version that reads at arm's length.
+     */
+    val widgetDetailedRows: Flow<Boolean>
+
+    /**
+     * Whether the editor suggests titles the user has typed before.
+     *
+     * The same offline lookup as the location suggestions: their own past events, on this phone,
+     * with nothing sent anywhere.
+     */
+    val suggestEventTitles: Flow<Boolean>
+
     /** What tapping a day header in Week or 3 Days does. */
     val dayTapAction: Flow<DayTapAction>
 
@@ -138,6 +177,16 @@ interface Preferences {
     /** Overrides the default for one calendar; [minutes] of null means "None on this calendar". */
     suspend fun setCalendarReminderDefault(calendarId: Long, minutes: Int?)
 
+    suspend fun setAllDayReminder(minutes: Int?)
+
+    suspend fun setShowDeclinedEvents(enabled: Boolean)
+
+    suspend fun setWidgetEventLimit(limit: Int)
+
+    suspend fun setWidgetDetailedRows(enabled: Boolean)
+
+    suspend fun setSuggestEventTitles(enabled: Boolean)
+
     /** Drops [calendarId]'s override so it follows [defaultReminderMinutes] again. */
     suspend fun clearCalendarReminderDefault(calendarId: Long)
     suspend fun setAccentColor(accent: AccentColor)
@@ -159,6 +208,15 @@ interface Preferences {
     companion object {
         /** Reminder offset a brand-new install pre-fills on events. */
         const val DEFAULT_REMINDER_MINUTES = 15
+
+        /**
+         * 09:00 the day before, which is when someone can still act on "it is Ana's birthday
+         * tomorrow" — buy the card, book the table, move the morning.
+         */
+        const val DEFAULT_ALL_DAY_REMINDER_MINUTES = 900
+
+        /** How many of a day's events the widget lists before it stops being glanceable. */
+        const val DEFAULT_WIDGET_EVENT_LIMIT = 5
 
         /** An hour, the length most calendar apps assume and most meetings actually are. */
         const val DEFAULT_EVENT_MINUTES = 60

@@ -43,6 +43,13 @@ class FakePreferences(
     override val firstDayOfWeek: MutableStateFlow<DayOfWeek> = MutableStateFlow(firstDay)
     override val defaultEventMinutes: MutableStateFlow<Int> = MutableStateFlow(eventMinutes)
     override val showWeekNumbers: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    override val allDayReminderMinutes: MutableStateFlow<Int?> =
+        MutableStateFlow(Preferences.DEFAULT_ALL_DAY_REMINDER_MINUTES)
+    override val showDeclinedEvents: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    override val widgetEventLimit: MutableStateFlow<Int> =
+        MutableStateFlow(Preferences.DEFAULT_WIDGET_EVENT_LIMIT)
+    override val widgetDetailedRows: MutableStateFlow<Boolean> = MutableStateFlow(true)
+    override val suggestEventTitles: MutableStateFlow<Boolean> = MutableStateFlow(true)
     override val dayTapAction: MutableStateFlow<DayTapAction> =
         MutableStateFlow(DayTapAction.Default)
 
@@ -61,6 +68,11 @@ class FakePreferences(
     override suspend fun setFirstDayOfWeek(day: DayOfWeek) { firstDayOfWeek.value = day }
     override suspend fun setDefaultEventMinutes(minutes: Int) { defaultEventMinutes.value = minutes }
     override suspend fun setShowWeekNumbers(enabled: Boolean) { showWeekNumbers.value = enabled }
+    override suspend fun setAllDayReminder(minutes: Int?) { allDayReminderMinutes.value = minutes }
+    override suspend fun setShowDeclinedEvents(enabled: Boolean) { showDeclinedEvents.value = enabled }
+    override suspend fun setWidgetEventLimit(limit: Int) { widgetEventLimit.value = limit }
+    override suspend fun setWidgetDetailedRows(enabled: Boolean) { widgetDetailedRows.value = enabled }
+    override suspend fun setSuggestEventTitles(enabled: Boolean) { suggestEventTitles.value = enabled }
     override suspend fun setDayTapAction(action: DayTapAction) { dayTapAction.value = action }
 
     override suspend fun setEventColorStrength(strength: EventColorStrength) {

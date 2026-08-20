@@ -8,6 +8,7 @@ import app.foscal.core.model.Event
 import app.foscal.ui.util.DayWindow
 import app.foscal.ui.util.Dates
 import app.foscal.ui.util.monthCalendarIds
+import app.foscal.ui.util.withoutDeclined
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,9 +64,12 @@ class MonthViewModel @Inject constructor(
         ) { current, (first, last) -> DayWindow.keepOrMove(current, first, last) }
         .distinctUntilChanged()
 
-    private val events = combine(calendarIds, window) { ids, w -> ids to w }
-        .flatMapLatest { (ids, w) ->
+    private val events =
+        combine(calendarIds, window, prefs.showDeclinedEvents) { ids, w, showDeclined ->
+            Triple(ids, w, showDeclined)
+        }.flatMapLatest { (ids, w, showDeclined) ->
             repository.observeEvents(ids, w.startInstant(zone), w.endInstant(zone))
+                .map { it.withoutDeclined(showDeclined) }
         }
 
     /**

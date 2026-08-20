@@ -163,6 +163,8 @@ fun SettingsScreen(
                     item {
                         CalendarStyleSettings(state = eventStyle, viewModel = eventStyleViewModel)
                     }
+                    item { SectionHeader("Home screen widget") }
+                    item { WidgetSettings(state = behaviour, viewModel = behaviourViewModel) }
                 }
                 SettingsSection.Behaviour -> {
                     item { SectionHeader("The calendar") }
@@ -194,7 +196,15 @@ fun SettingsScreen(
                     onEditCalendar = { cal -> viewModel.startEdit(cal.id, cal.displayName, cal.color) },
                     onDeleteCalendar = { cal -> viewModel.confirmDelete(cal.id, cal.displayName) },
                 )
-                SettingsSection.Reminders -> remindersSection(state, viewModel)
+                SettingsSection.Reminders -> remindersSection(
+                    state = state,
+                    viewModel = viewModel,
+                    behaviour = behaviour,
+                    behaviourViewModel = behaviourViewModel,
+                )
+                SettingsSection.Sync -> item {
+                    SyncSettings(calendars = state.items)
+                }
                 SettingsSection.Transfer -> item {
                     ImportExportSection(
                         rows = state.items,
@@ -392,13 +402,15 @@ private fun LazyListScope.calendarsSection(
 private fun LazyListScope.remindersSection(
     state: CalendarsUiState,
     viewModel: CalendarsViewModel,
+    behaviour: app.foscal.ui.home.BehaviourState,
+    behaviourViewModel: app.foscal.ui.home.BehaviourViewModel,
 ) {
     item {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Default reminder", style = MaterialTheme.typography.bodyMedium)
+            Text("Timed events", style = MaterialTheme.typography.bodyMedium)
             ReminderChips(
                 selection = state.defaultReminderMinutes
                     ?.let { ReminderSelection.Minutes(it) }
@@ -413,8 +425,61 @@ private fun LazyListScope.remindersSection(
             )
         }
     }
+    item {
+        // Its own default, because the two are not the same question. "15 minutes before" is a
+        // sensible answer for a meeting and a useless one for a birthday: on an all-day event it
+        // fires at 23:45 the night before, which warns nobody about anything.
+        AllDayReminderRow(
+            minutes = behaviour.allDayReminderMinutes,
+            onSelect = behaviourViewModel::setAllDayReminder,
+        )
+    }
     item { ReminderDiagnosticsCard(modifier = Modifier.padding(horizontal = 12.dp)) }
 }
+
+/**
+ * The reminder a new all-day event starts with, phrased as a time of day rather than an offset.
+ *
+ * Nobody thinks "900 minutes before"; they think "the morning before". The stored value is still
+ * minutes before local midnight, which is what the provider understands.
+ */
+@Composable
+private fun AllDayReminderRow(minutes: Int?, onSelect: (Int?) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    if (picking) {
+        ChoiceDialog(
+            title = "All-day events",
+            options = AllDayReminderOptions.map { (value, label) -> (value?.toString() ?: "") to label },
+            selected = minutes?.toString() ?: "",
+            onSelect = {
+                onSelect(it.toIntOrNull())
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
+    }
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("All-day events", style = MaterialTheme.typography.bodyMedium)
+        ValueRow(
+            title = "Remind me",
+            value = AllDayReminderOptions.firstOrNull { it.first == minutes }?.second ?: "None",
+            onClick = { picking = true },
+        )
+    }
+}
+
+/** Offsets measured back from local midnight of the day the event falls on. */
+private val AllDayReminderOptions: List<Pair<Int?, String>> = listOf(
+    null to "None",
+    360 to "The evening before, 18:00",
+    900 to "The morning before, 09:00",
+    1440 to "A day before, midnight",
+    2340 to "Two mornings before, 09:00",
+    10080 to "A week before",
+)
 
 @Composable
 private fun AboutSection() {

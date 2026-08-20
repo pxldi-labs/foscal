@@ -91,6 +91,31 @@ class UserPreferencesRepository @Inject constructor(
     override val showWeekNumbers: Flow<Boolean> =
         context.dataStore.data.map { it[SHOW_WEEK_NUMBERS] ?: false }
 
+    // The same sentinel the timed default uses: DataStore cannot hold a null Int, so -1 is how
+    // "the user chose None" is stored, and an absent key is "never asked, use the built-in".
+    override val allDayReminderMinutes: Flow<Int?> =
+        context.dataStore.data.map { prefs ->
+            when (val stored = prefs[ALL_DAY_REMINDER]) {
+                null -> Preferences.DEFAULT_ALL_DAY_REMINDER_MINUTES
+                -1 -> null
+                else -> stored
+            }
+        }
+
+    override val showDeclinedEvents: Flow<Boolean> =
+        context.dataStore.data.map { it[SHOW_DECLINED] ?: false }
+
+    override val widgetEventLimit: Flow<Int> =
+        context.dataStore.data.map {
+            it[WIDGET_EVENT_LIMIT]?.coerceIn(1, 20) ?: Preferences.DEFAULT_WIDGET_EVENT_LIMIT
+        }
+
+    override val widgetDetailedRows: Flow<Boolean> =
+        context.dataStore.data.map { it[WIDGET_DETAILED_ROWS] ?: true }
+
+    override val suggestEventTitles: Flow<Boolean> =
+        context.dataStore.data.map { it[SUGGEST_TITLES] ?: true }
+
     override val dayTapAction: Flow<DayTapAction> =
         context.dataStore.data.map { DayTapAction.fromName(it[DAY_TAP_ACTION]) }
 
@@ -196,6 +221,26 @@ class UserPreferencesRepository @Inject constructor(
         context.dataStore.edit { prefs -> prefs[SHOW_WEEK_NUMBERS] = enabled }
     }
 
+    override suspend fun setAllDayReminder(minutes: Int?) {
+        context.dataStore.edit { prefs -> prefs[ALL_DAY_REMINDER] = minutes ?: -1 }
+    }
+
+    override suspend fun setShowDeclinedEvents(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[SHOW_DECLINED] = enabled }
+    }
+
+    override suspend fun setWidgetEventLimit(limit: Int) {
+        context.dataStore.edit { prefs -> prefs[WIDGET_EVENT_LIMIT] = limit.coerceIn(1, 20) }
+    }
+
+    override suspend fun setWidgetDetailedRows(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[WIDGET_DETAILED_ROWS] = enabled }
+    }
+
+    override suspend fun setSuggestEventTitles(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[SUGGEST_TITLES] = enabled }
+    }
+
     override suspend fun setDayTapAction(action: DayTapAction) {
         context.dataStore.edit { prefs -> prefs[DAY_TAP_ACTION] = action.name }
     }
@@ -246,6 +291,11 @@ class UserPreferencesRepository @Inject constructor(
         private val FIRST_DAY_OF_WEEK = intPreferencesKey("first_day_of_week")
         private val DEFAULT_EVENT_MINUTES = intPreferencesKey("default_event_minutes")
         private val SHOW_WEEK_NUMBERS = booleanPreferencesKey("show_week_numbers")
+        private val ALL_DAY_REMINDER = intPreferencesKey("all_day_reminder_minutes")
+        private val SHOW_DECLINED = booleanPreferencesKey("show_declined_events")
+        private val WIDGET_EVENT_LIMIT = intPreferencesKey("widget_event_limit")
+        private val WIDGET_DETAILED_ROWS = booleanPreferencesKey("widget_detailed_rows")
+        private val SUGGEST_TITLES = booleanPreferencesKey("suggest_event_titles")
         private val DAY_TAP_ACTION = stringPreferencesKey("day_tap_action")
         private val DEFAULT_CALENDAR_ID = longPreferencesKey("default_calendar_id")
         private val EVENT_COLOR_STRENGTH = stringPreferencesKey("event_color_strength")

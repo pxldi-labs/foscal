@@ -236,21 +236,58 @@ private fun EditorForm(
                     keyboard?.show()
                 }
             }
-            TextField(
-                value = titleField,
-                onValueChange = {
-                    titleField = it
-                    viewModel.updateTitle(it.text)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .focusRequester(titleFocus),
-                placeholder = { Text("Add title", style = MaterialTheme.typography.titleLarge) },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.titleLarge,
-                colors = plainFieldColors(),
-            )
+            // Suggested from the user's own past titles, the way the location field is: most of
+            // a calendar is repetition, and "Zahnarzt" has almost certainly been typed before.
+            val titleSuggestions = remember(state.title, state.recentTitles) {
+                val query = state.title.trim()
+                if (query.isEmpty()) {
+                    emptyList()
+                } else {
+                    state.recentTitles
+                        .filter { it != state.title && it.contains(query, ignoreCase = true) }
+                        .take(5)
+                }
+            }
+            var titleMenu by remember { mutableStateOf(false) }
+            val titleMenuOpen = titleMenu && titleSuggestions.isNotEmpty()
+            ExposedDropdownMenuBox(
+                expanded = titleMenuOpen,
+                onExpandedChange = { titleMenu = it },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                TextField(
+                    value = titleField,
+                    onValueChange = {
+                        titleField = it
+                        titleMenu = true
+                        viewModel.updateTitle(it.text)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+                        .focusRequester(titleFocus),
+                    placeholder = { Text("Add title", style = MaterialTheme.typography.titleLarge) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.titleLarge,
+                    colors = plainFieldColors(),
+                )
+                ExposedDropdownMenu(
+                    expanded = titleMenuOpen,
+                    onDismissRequest = { titleMenu = false },
+                ) {
+                    titleSuggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = { Text(suggestion) },
+                            onClick = {
+                                titleField = TextFieldValue(suggestion, TextRange(suggestion.length))
+                                viewModel.updateTitle(suggestion)
+                                titleMenu = false
+                            },
+                        )
+                    }
+                }
+            }
         }
 
         // Everything below reads as one fact per row, down a rail of icons: what the row is on

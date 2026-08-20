@@ -7,6 +7,7 @@ import android.widget.RemoteViewsService
 import app.foscal.MainActivity
 import app.foscal.R
 import app.foscal.core.model.Event
+import app.foscal.ui.util.withoutDeclined
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -48,6 +49,9 @@ class AgendaWidgetFactory(private val context: Context) : RemoteViewsService.Rem
         val today = LocalDate.now(zone)
         val hidden = prefs.hiddenCalendarIds.first()
         val use24Hour = prefs.use24HourClock.first()
+        val perDay = prefs.widgetEventLimit.first()
+        val detailed = prefs.widgetDetailedRows.first()
+        val showDeclined = prefs.showDeclinedEvents.first()
         val ids = repo.getCalendars()
             .filter { it.visible && it.id.toString() !in hidden }
             .map { it.id }
@@ -55,7 +59,15 @@ class AgendaWidgetFactory(private val context: Context) : RemoteViewsService.Rem
         if (ids.isEmpty()) return emptyList()
         val from = Instant.now()
         val to = today.plusDays(HORIZON_DAYS).atStartOfDay(zone).toInstant()
-        val events = repo.getEvents(ids, from, to).sortedBy { it.start }
+        val events = repo.getEvents(ids, from, to)
+            .withoutDeclined(showDeclined)
+            .sortedBy { it.start }
+            // Capped per day rather than overall: a single busy Tuesday used to fill the widget
+            // and push the rest of the week off the bottom, which answers "what is on Tuesday"
+            // when the question was "what is coming up".
+            .groupBy { it.startLocalDate(zone).coerceAtLeast(today) }
+            .toSortedMap()
+            .flatMap { (_, ofDay) -> ofDay.take(perDay) }
 
         var lastDay: LocalDate? = null
         return events.take(MAX_ROWS).map { e ->
@@ -68,7 +80,7 @@ class AgendaWidgetFactory(private val context: Context) : RemoteViewsService.Rem
                 eventId = e.id,
                 instanceStart = e.start.toEpochMilli(),
                 title = e.title,
-                subtitle = subtitleFor(e, zone, use24Hour, locale),
+                subtitle = subtitleFor(e, zone, use24Hour, locale, detailed),
                 color = e.color,
                 weekday = if (repeat) "" else day.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
                 day = if (repeat) "" else day.dayOfMonth.toString(),
@@ -109,6 +121,7 @@ class AgendaWidgetFactory(private val context: Context) : RemoteViewsService.Rem
         zone: ZoneId,
         use24Hour: Boolean,
         locale: Locale,
+        detailed: Boolean,
     ): String {
         val first = event.startLocalDate(zone)
         val last = event.lastLocalDate(zone).coerceAtLeast(first)
@@ -130,8 +143,14 @@ class AgendaWidgetFactory(private val context: Context) : RemoteViewsService.Rem
         }
         // Location last, on the same separator as the rest: it is the thing you check second,
         // after "when", and it is also the part most likely to be missing.
-        val place = event.location?.trim().orEmpty()
-        return listOf(whenLabel, place).filter { it.isNotBlank() }.joinToString("  •  ")
+        val place = if (detailed) event.location?.trim().orEmpty() else ""
+        val shortWhen = when {
+            detailed || event.allDay -> whenLabel
+            // Just the start. A widget read at arm's length is answering "when", and the end time
+            // is a second number to parse for a question nobody asked at a glance.
+            else -> event.start.atZone(zone).toLocalTime().format(timeFmt)
+        }
+        return listOf(shortWhen, place).filter { it.isNotBlank() }.joinToString("  •  ")
     }
 
     companion object {

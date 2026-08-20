@@ -88,6 +88,14 @@ interface CalendarRepository {
      */
     suspend fun getRecentLocations(limit: Int = 50): List<String>
 
+    /**
+     * Titles the user has written before, newest first, deduplicated.
+     *
+     * The same offline lookup as [getRecentLocations] and for the same reason: most calendars are
+     * mostly repetition, and the thing being typed has usually been typed before.
+     */
+    suspend fun getRecentTitles(limit: Int = 50): List<String>
+
     /** Emits the current list of calendars, then re-emits whenever the provider changes. */
     fun observeCalendars(): Flow<List<Calendar>>
 
@@ -411,6 +419,26 @@ class CalendarContractRepository @Inject constructor(
                 while (c.moveToNext() && seen.size < limit) {
                     val location = c.getString(0)?.trim().orEmpty()
                     if (location.isNotEmpty()) seen += location
+                }
+            }
+            seen.toList()
+        }
+
+    override suspend fun getRecentTitles(limit: Int): List<String> =
+        withContext(Dispatchers.IO) {
+            val seen = LinkedHashSet<String>()
+            safeQuery(
+                CalendarContract.Events.CONTENT_URI,
+                arrayOf(CalendarContract.Events.TITLE),
+                "${CalendarContract.Events.TITLE} IS NOT NULL AND " +
+                    "${CalendarContract.Events.TITLE} != '' AND " +
+                    "${CalendarContract.Events.DELETED} != 1",
+                null,
+                "${CalendarContract.Events.DTSTART} DESC",
+            )?.use { c ->
+                while (c.moveToNext() && seen.size < limit) {
+                    val title = c.getString(0)?.trim().orEmpty()
+                    if (title.isNotEmpty()) seen += title
                 }
             }
             seen.toList()
@@ -1444,6 +1472,7 @@ class CalendarContractRepository @Inject constructor(
             timezone = getString(8),
             color = if (displayColor != 0) displayColor else calendarColor,
             rrule = getString(11),
+            declined = getInt(12) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED,
         )
     }
 
@@ -1522,6 +1551,7 @@ class CalendarContractRepository @Inject constructor(
             CalendarContract.Instances.DISPLAY_COLOR,
             CalendarContract.Instances.CALENDAR_COLOR,
             CalendarContract.Instances.RRULE,
+            CalendarContract.Instances.SELF_ATTENDEE_STATUS,
         )
 
         /** Column order the master-row reader depends on; keep in sync with `readEventRow`. */

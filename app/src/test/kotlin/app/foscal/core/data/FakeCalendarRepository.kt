@@ -101,6 +101,13 @@ class FakeCalendarRepository(
             .distinct()
             .take(limit)
 
+    override suspend fun getRecentTitles(limit: Int): List<String> =
+        events.sortedByDescending { it.start }
+            .map { it.title.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(limit)
+
     override fun observeCalendars(): Flow<List<Calendar>> = MutableStateFlow(calendars)
 
     /**

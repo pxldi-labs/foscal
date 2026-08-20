@@ -52,6 +52,8 @@ data class EditorUiState(
     val location: String = "",
     /** Distinct locations from the user's history, for the editor's offline autocomplete. */
     val recentLocations: List<String> = emptyList(),
+    /** Distinct titles from the user's history; empty when the suggestion setting is off. */
+    val recentTitles: List<String> = emptyList(),
     /** Whether the opt-in OpenStreetMap "Pick on map" button should be offered. */
     val mapsEnabled: Boolean = false,
     val description: String = "",
@@ -161,6 +163,7 @@ class EventEditorViewModel @Inject constructor(
      * defaults out of order.
      */
     private var globalReminderDefault: Int? = null
+    private var allDayReminderDefault: Int? = null
     private var calendarReminderDefaults: Map<Long, Int?> = emptyMap()
 
     private val _state = MutableStateFlow(EditorUiState())
@@ -201,10 +204,16 @@ class EventEditorViewModel @Inject constructor(
         viewModelScope.launch {
             val hidden = prefs.hiddenCalendarIds.first()
             globalReminderDefault = prefs.defaultReminderMinutes.first()
+            allDayReminderDefault = prefs.allDayReminderMinutes.first()
             calendarReminderDefaults = prefs.calendarReminderDefaults.first()
             val calendars = repository.getCalendars()
             val visible = calendars.filter { it.visible && it.id.toString() !in hidden }
             val recentLocations = repository.getRecentLocations()
+            val recentTitles = if (prefs.suggestEventTitles.first()) {
+                repository.getRecentTitles()
+            } else {
+                emptyList()
+            }
             val mapsEnabled = prefs.osmMapsEnabled.first()
             if (eventId > 0L) {
                 // For a recurring event, many instances share the same id; startArg carries the
@@ -246,6 +255,7 @@ class EventEditorViewModel @Inject constructor(
                         timezone = eventZone,
                         location = event.location.orEmpty(),
                         recentLocations = recentLocations,
+                        recentTitles = recentTitles,
                         mapsEnabled = mapsEnabled,
                         description = event.description.orEmpty(),
                         frequency = spec.frequency,
@@ -296,6 +306,7 @@ class EventEditorViewModel @Inject constructor(
                         endTime = if (source.allDay) LocalTime.MIDNIGHT else endZ.toLocalTime(),
                         location = source.location.orEmpty(),
                         recentLocations = recentLocations,
+                        recentTitles = recentTitles,
                         mapsEnabled = mapsEnabled,
                         description = source.description.orEmpty(),
                         frequency = spec.frequency,
@@ -369,7 +380,21 @@ class EventEditorViewModel @Inject constructor(
     fun updateTitle(value: String) = mutate { it.copy(title = value) }
     fun updateLocation(value: String) = mutate { it.copy(location = value) }
     fun updateDescription(value: String) = mutate { it.copy(description = value) }
-    fun updateAllDay(value: Boolean) = mutate { it.copy(allDay = value) }
+    /**
+     * All-day and timed events answer "when should this warn me" differently, so switching between
+     * them re-applies the matching default — until the user has chosen a reminder themselves, at
+     * which point their choice outranks both. "15 minutes before" on an all-day event fires at
+     * 23:45 the night before, which is the bug this setting exists to fix.
+     */
+    fun updateAllDay(value: Boolean) = mutate { state ->
+        val next = state.copy(allDay = value)
+        if (state.remindersTouched || state.isEditing) {
+            next
+        } else {
+            val minutes = if (value) allDayReminderDefault else globalReminderDefault
+            next.copy(reminderMinutes = listOfNotNull(minutes))
+        }
+    }
     fun updateStartDate(date: LocalDate) = mutate { it.copy(startDate = date).dragEndToStart() }
     fun updateStartTime(time: LocalTime) = mutate { it.copy(startTime = time).dragEndToStart() }
     fun updateEndDate(date: LocalDate) = mutate { it.copy(endDate = date).dragStartToEnd() }
