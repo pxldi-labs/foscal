@@ -24,11 +24,21 @@ object Dates {
      * the user's language: the default is captured once per process, which left the weekday strip
      * showing the old language until the app was killed.
      */
+    /**
+     * The seven weekday headings, starting at [firstDayOfWeek].
+     *
+     * [style] because the two grids have different room and different needs. A week column is
+     * already headed by its date, so one letter is enough there; a month grid has nothing but the
+     * heading to say which column is which, and "T" over "T" is a coin toss every time you look
+     * for Thursday. `SHORT` is locale-aware — "Mon" in English, "Mo" in German, and the right
+     * abbreviation in scripts that have no notion of an initial.
+     */
     fun weekStartLabels(
         locale: Locale,
         firstDayOfWeek: DayOfWeek = DayOfWeek.MONDAY,
+        style: TextStyle = TextStyle.NARROW,
     ): List<String> = (0..6).map {
-        firstDayOfWeek.plus(it.toLong()).getDisplayName(TextStyle.NARROW, locale)
+        firstDayOfWeek.plus(it.toLong()).getDisplayName(style, locale)
     }
 
     fun instantToLocal(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): LocalDateTime =
