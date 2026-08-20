@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -100,9 +101,11 @@ import app.foscal.ui.util.LocalUse24HourClock
 import app.foscal.ui.util.currentLocale
 import app.foscal.ui.util.rememberDateFormatter
 import app.foscal.ui.util.rememberTimeFormatter
+import app.foscal.ui.util.timeFormatter
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.TextStyle
 
 private val rowPadding = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
@@ -309,6 +312,27 @@ private fun EditorForm(
                 onPickTime = viewModel::updateEndTime,
                 modifier = rowPadding.fillMaxWidth(),
             )
+            // All-day events are UTC by contract and have no clock time to anchor, so the row
+            // would be offering a choice that does nothing.
+            AnimatedVisibility(
+                visible = !state.allDay,
+                enter = expandVertically(tween(Motion.DurationMedium)) +
+                    fadeIn(tween(Motion.DurationMedium)),
+                exit = shrinkVertically(tween(Motion.DurationShort)) +
+                    fadeOut(tween(Motion.DurationShort)),
+            ) {
+                TimezoneRow(
+                    zone = state.timezone,
+                    startDate = state.startDate,
+                    startTime = state.startTime,
+                    endDate = state.endDate,
+                    endTime = state.endTime,
+                    differs = state.timezoneDiffers,
+                    is24Hour = LocalUse24HourClock.current,
+                    onSelect = viewModel::updateTimezone,
+                    modifier = rowPadding.fillMaxWidth(),
+                )
+            }
         }
 
         // Recurrence
@@ -666,7 +690,19 @@ private fun ColorRow(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Colour", style = MaterialTheme.typography.bodyLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Colour", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                // Named, so the choice can be read rather than only compared. An unnamed colour is
+                // one a sync adapter chose, and "Custom" is the honest thing to call it.
+                when {
+                    selected == null -> "The calendar's"
+                    else -> CalendarColors.nameOf(selected) ?: "Custom"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -688,6 +724,72 @@ private fun ColorRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * The zone the times above are written in.
+ *
+ * Shown for every timed event rather than only the travelling ones: a row that appears when an
+ * event happens to be anchored elsewhere is a row nobody knows exists until it surprises them, and
+ * the whole point is to be able to say "09:00 in New York" *before* the event is wrong.
+ */
+@Composable
+private fun TimezoneRow(
+    zone: ZoneId,
+    startDate: LocalDate,
+    startTime: LocalTime,
+    endDate: LocalDate,
+    endTime: LocalTime,
+    differs: Boolean,
+    is24Hour: Boolean,
+    onSelect: (ZoneId) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var picking by remember { mutableStateOf(false) }
+    val locale = currentLocale()
+    val formatter = remember(is24Hour, locale) { timeFormatter(is24Hour, locale) }
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable { picking = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            Icons.Filled.Public,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(zoneLabel(zone), style = MaterialTheme.typography.bodyLarge)
+            if (differs) {
+                // What the phone will show once this is saved. The times above are in the event's
+                // zone, which is right for editing and useless for answering "so when do I leave?".
+                val here = ZoneId.systemDefault()
+                val from = startDate.atTime(startTime).atZone(zone).withZoneSameInstant(here)
+                val to = endDate.atTime(endTime).atZone(zone).withZoneSameInstant(here)
+                Text(
+                    "${from.format(formatter)} – ${to.format(formatter)} where you are",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+
+    if (picking) {
+        TimezonePickerDialog(
+            selected = zone,
+            onSelect = {
+                onSelect(it)
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
     }
 }
 
