@@ -433,6 +433,13 @@ private fun AboutSection() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // The Open Font License asks that the fonts be credited where the app credits anything,
+        // and its full text ships beside them in the APK's assets.
+        Text(
+            "Set in Gabarito and Manrope, both under the SIL Open Font License 1.1.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

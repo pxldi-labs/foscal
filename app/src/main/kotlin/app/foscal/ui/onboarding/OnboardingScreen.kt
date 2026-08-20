@@ -72,7 +72,7 @@ import app.foscal.R
 import app.foscal.core.data.CalendarPermissionState
 import app.foscal.core.model.AccentColor
 import app.foscal.core.model.ThemeMode
-import app.foscal.core.ui.theme.BricolageFamily
+import app.foscal.core.ui.theme.DisplayFamily
 import app.foscal.core.ui.theme.Motion
 import app.foscal.ui.settings.AccentPicker
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -725,7 +725,7 @@ private fun FoscalWordmark() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             "Foscal",
-            style = MaterialTheme.typography.displayMedium.copy(fontFamily = BricolageFamily),
+            style = MaterialTheme.typography.displayMedium.copy(fontFamily = DisplayFamily),
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center,

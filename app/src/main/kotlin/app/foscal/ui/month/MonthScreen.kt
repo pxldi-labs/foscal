@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.core.model.Event
-import app.foscal.core.ui.theme.BricolageFamily
+import app.foscal.core.ui.theme.DisplayFamily
 import app.foscal.core.ui.theme.Motion
 import app.foscal.core.ui.theme.onTodayDiscColor
 import app.foscal.core.ui.theme.todayDiscColor
@@ -314,7 +314,7 @@ private fun MonthJumpDialog(
 private fun TitleText(text: String, color: Color, fontWeight: FontWeight) {
     Text(
         text,
-        fontFamily = BricolageFamily,
+        fontFamily = DisplayFamily,
         fontSize = 24.sp,
         lineHeight = 28.sp,
         fontWeight = fontWeight,
@@ -585,7 +585,7 @@ private fun DayCell(
             ) {
                 Text(
                     text = date.dayOfMonth.toString(),
-                    fontFamily = BricolageFamily,
+                    fontFamily = DisplayFamily,
                     fontSize = 15.5.sp,
                     fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
                     color = numberColor,
