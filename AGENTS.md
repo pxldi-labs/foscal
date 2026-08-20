@@ -169,11 +169,17 @@ The visual identity ("the Foscal voice") is derived from the Claude Design
 project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-system:
 
 - **Typography** — two variable fonts bundled in `core/core-ui/src/main/res/font`:
-  **Bricolage Grotesque** (display/voice: date numerals, month header, screen
-  titles, event-detail title) and **Hanken Grotesque** (all body/UI). Wired via
+  **Gabarito** (display/voice: date numerals, month header, screen titles,
+  event-detail title) and **Manrope** (all body/UI). Wired via
   `core-ui/.../theme/Type.kt` → `FoscalTypography`; display+headline styles
-  are Bricolage, everything else Hanken. Reach for `BricolageFamily` directly
-  only for numerals/headers that need the voice.
+  are `DisplayFamily`, everything else `UiFamily`. Reach for `DisplayFamily`
+  directly only for numerals/headers that need the voice. Both are SIL Open
+  Font License 1.1 — **a font swap is not done until `OFL-<Face>.txt` sits in
+  `core/core-ui/src/main/assets/licenses/` and the face is named in Settings →
+  About and the README.** The licence requires its text to travel with the
+  font, which means inside the APK, not just in the repo. The widget's XML
+  layouts name the font resources directly (`@font/gabarito_variable`), so a
+  rename has to reach `app/src/main/res/layout/widget_*.xml` too.
 - **Accent** — Cobalt `#1A73E8` (`FoscalBlue`) is the default, driving today,
   selection, buttons and the FAB. Users can switch to **Violet**, **Forest**, or a
   custom ARGB color in onboarding or Settings; the choice persists via
@@ -378,6 +384,16 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
 - **Timeline headers must use `TimelineGutterWidth` / `TimelineEndInset`.** Any weekday strip drawn
   above a `TimelineLayout` shares those two values or its columns drift out of alignment with the
   grid columns below; the error accumulates across the week and shows up on the last day.
+- **`DrawScope.drawLine`, `drawCircle` and `Stroke` take pixels, not dp.** A literal `0.5f` is half
+  a *physical* pixel — 0.19 dp on a 420 dpi phone, and thinner still on a sharper one, so the line
+  gets fainter as the screen gets better. The hour grid shipped that way for months and read as
+  "too subtle" rather than as a bug. Always write `SomeWidth.dp.toPx()`; the named widths for the
+  grid live at the top of `Timeline.kt`.
+- **Hour labels are centred on their line, not hung off the top of the hour.** They name a line, so
+  they straddle it: each sits in a `HourLabelHeight` box offset up by half of it. Midnight is
+  deliberately unlabelled, because half of "00:00" would fall above the top edge of the grid. The
+  "now" label in the gutter uses the same rule so the two stay comparable, and
+  `NowLabelClearance` is what keeps them from printing over each other.
 - **A null `Preferences.defaultReminderMinutes` means "None", not "unset".** DataStore cannot hold
   a null Int, so the stored sentinel is `-1`; the flow resolves an *absent* key to the built-in
   15-minute default itself. A caller writing `?: 15` therefore re-adds the exact alarm the user

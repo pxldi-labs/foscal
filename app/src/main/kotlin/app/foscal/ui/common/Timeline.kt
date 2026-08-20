@@ -102,6 +102,34 @@ private val MinBlockHeight = 16.dp
 /** How close the current time has to be to an hour before that hour's label steps aside. */
 private val NowLabelClearance = 16.dp
 
+/**
+ * The box an hour label is centred in, and so what the label is offset by to straddle its line.
+ *
+ * Fixed rather than measured: a label whose position depends on the font's own line metrics moves
+ * whenever the type does, and this has to line up with a line drawn from a different measurement.
+ * Comfortably taller than 11sp, so the text is centred in it rather than clipped by it.
+ */
+private val HourLabelHeight = 14.dp
+
+/**
+ * Grid line widths, in dp — which is the whole point of naming them.
+ *
+ * `DrawScope.drawLine` takes **pixels**, so the `0.5f` that used to be here was half a physical
+ * pixel: 0.19 dp on a 420 dpi phone, a third of the hairline it was meant to be, and most of what
+ * survived was then spent on antialiasing. A ruler has to be the same weight on every screen.
+ */
+private val HourLineWidth = 1.dp
+private val NowLineWidth = 1.5.dp
+private val NowDotRadius = 3.dp
+
+/**
+ * Every sixth line is drawn darker, so 06:00, 12:00 and 18:00 are findable while scrolling.
+ *
+ * Six rather than three: at a screen's worth of hours you want one landmark in view, not three
+ * competing ones.
+ */
+private const val AnchorEveryHours = 6
+
 val TimelineEndInset = 4.dp
 
 /**
@@ -212,10 +240,16 @@ fun TimelineLayout(
     // The hour lines are a ruler, not a border: they only have to be findable when you look for
     // them. A solid outline colour turns the grid into the loudest thing on an empty day. Ink in
     // light, white in dark — a dark grey line on a dark background reads as dirt.
-    val hourLineColor = if (LocalIsDarkTheme.current) {
+    val darkTheme = LocalIsDarkTheme.current
+    val hourLineColor = if (darkTheme) {
         Color.White.copy(alpha = 0.17f)
     } else {
-        Color.Black.copy(alpha = 0.11f)
+        Color.Black.copy(alpha = 0.12f)
+    }
+    val anchorLineColor = if (darkTheme) {
+        Color.White.copy(alpha = 0.34f)
+    } else {
+        Color.Black.copy(alpha = 0.26f)
     }
     val nowColor = MaterialTheme.colorScheme.error
     val todayTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
@@ -300,30 +334,39 @@ fun TimelineLayout(
                         .height(totalHeight)
                         .padding(end = TimelineEndInset),
                 ) {
-                    Column(Modifier.width(TimelineGutterWidth)) {
-                        for (h in 0..23) {
+                    // The label names a line, so it straddles one: each is centred on its hour
+                    // rather than hung off the top of the hour's box, which is where it used to
+                    // sit and why every time read about half a text-height low. Midnight goes
+                    // unlabelled — half of "00:00" would be above the top edge of the grid, and a
+                    // label cut in half is worse than no label at all.
+                    Box(
+                        Modifier
+                            .width(TimelineGutterWidth)
+                            .fillMaxHeight(),
+                    ) {
+                        for (h in 1..23) {
+                            // The hour gives way to the current time when the two would land
+                            // on each other. "12:07" printed over "12:00" is unreadable, and
+                            // of the two the one you already know is the hour.
+                            val eclipsed = showNowLabel &&
+                                hourHeight * abs(nowFractionalHour - h) < NowLabelClearance
+                            if (eclipsed) continue
                             Box(
                                 Modifier
-                                    .height(hourHeight)
-                                    .fillMaxWidth(),
-                                contentAlignment = Alignment.TopEnd,
+                                    .align(Alignment.TopEnd)
+                                    .offset(y = hourHeight * h - HourLabelHeight / 2)
+                                    .height(HourLabelHeight)
+                                    .padding(end = 10.dp),
+                                contentAlignment = Alignment.CenterEnd,
                             ) {
-                                // The hour gives way to the current time when the two would land
-                                // on each other. "12:07" printed over "12:00" is unreadable, and
-                                // of the two the one you already know is the hour.
-                                val eclipsed = showNowLabel &&
-                                    hourHeight * abs(nowFractionalHour - h) < NowLabelClearance
-                                if (!eclipsed) {
-                                    Text(
-                                        // The whole time, not just the hour. "05" beside a grid
-                                        // line is a label you have to decode; "05:00" is one you
-                                        // read.
-                                        "${"%02d".format(h)}:00",
-                                        modifier = Modifier.padding(end = 10.dp),
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+                                Text(
+                                    // The whole time, not just the hour. "05" beside a grid
+                                    // line is a label you have to decode; "05:00" is one you
+                                    // read.
+                                    "${"%02d".format(h)}:00",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }
@@ -439,12 +482,14 @@ fun TimelineLayout(
                             val colWidth = maxWidth
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val hourPx = hourHeight.toPx()
+                                val strokePx = HourLineWidth.toPx()
                                 for (h in 1..23) {
+                                    val anchored = h % AnchorEveryHours == 0
                                     drawLine(
-                                        color = hourLineColor,
+                                        color = if (anchored) anchorLineColor else hourLineColor,
                                         start = Offset(0f, h * hourPx),
                                         end = Offset(size.width, h * hourPx),
-                                        strokeWidth = 0.5f,
+                                        strokeWidth = strokePx,
                                     )
                                 }
                             }
@@ -596,11 +641,11 @@ fun TimelineLayout(
                                         color = nowColor,
                                         start = Offset(0f, nowY),
                                         end = Offset(size.width, nowY),
-                                        strokeWidth = 1.5f,
+                                        strokeWidth = NowLineWidth.toPx(),
                                     )
                                     drawCircle(
                                         color = nowColor,
-                                        radius = 4.5f,
+                                        radius = NowDotRadius.toPx(),
                                         center = Offset(0f, nowY),
                                     )
                                 }
@@ -613,8 +658,9 @@ fun TimelineLayout(
                 if (showNowLabel) {
                     Box(
                         Modifier
-                            .width(54.dp)
-                            .offset(y = hourHeight * nowFractionalHour - 8.dp),
+                            .width(TimelineGutterWidth)
+                            .offset(y = hourHeight * nowFractionalHour - HourLabelHeight / 2)
+                            .height(HourLabelHeight),
                         contentAlignment = Alignment.CenterEnd,
                     ) {
                         // Coloured text, not a filled chip. The chip was the loudest thing on a
