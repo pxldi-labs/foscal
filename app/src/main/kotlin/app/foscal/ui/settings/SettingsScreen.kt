@@ -435,8 +435,8 @@ private fun AboutSection() {
         )
         Text("Foscal ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleLarge)
         Text(
-            "A calendar that keeps to itself. Your events stay in the calendars this phone " +
-                "already has \u2014 there is no account to make, and nothing leaves the device.",
+            "Your events live in the calendars this phone already has. There is no account to " +
+                "make, and nothing leaves the device.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

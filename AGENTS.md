@@ -577,6 +577,9 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
 
 ## Conventions
 
+- **No em dashes in anything the user reads.** Screen copy, dialog text, notification text, store
+  listing: use a full stop, a comma or a colon instead. The house style survived the whole app
+  having exactly one of them; keep it that way.
 - Kotlin only (no Java sources).
 - Follow Material 3 in Compose. Theme lives in `:core-ui`.
 - No comments unless they explain *why* something non-obvious is done.
