@@ -179,7 +179,10 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   About and the README.** The licence requires its text to travel with the
   font, which means inside the APK, not just in the repo. The widget's XML
   layouts name the font resources directly (`@font/gabarito_variable`), so a
-  rename has to reach `app/src/main/res/layout/widget_*.xml` too.
+  rename has to reach `app/src/main/res/layout/widget_*.xml` too, and the checked-in baseline
+  profiles (`app/src/release/generated/baselineProfiles/*.txt`) name the generated methods by
+  signature — a rule that no longer resolves is silently dropped, so a rename quietly costs the
+  startup coverage it was there to buy.
 - **Accent** — Cobalt `#1A73E8` (`FoscalBlue`) is the default, driving today,
   selection, buttons and the FAB. Users can switch to **Violet**, **Forest**, or a
   custom ARGB color in onboarding or Settings; the choice persists via

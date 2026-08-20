@@ -19004,10 +19004,10 @@ Lapp/foscal/core/ui/theme/ThemeKt$WhenMappings;
 SPLapp/foscal/core/ui/theme/ThemeKt$WhenMappings;-><clinit>()V
 Lapp/foscal/core/ui/theme/TypeKt;
 SPLapp/foscal/core/ui/theme/TypeKt;-><clinit>()V
-SPLapp/foscal/core/ui/theme/TypeKt;->bricolage(Landroidx/compose/ui/text/font/FontWeight;)Landroidx/compose/ui/text/font/Font;
-SPLapp/foscal/core/ui/theme/TypeKt;->getBricolageFamily()Landroidx/compose/ui/text/font/FontFamily;
+SPLapp/foscal/core/ui/theme/TypeKt;->gabarito(Landroidx/compose/ui/text/font/FontWeight;)Landroidx/compose/ui/text/font/Font;
+SPLapp/foscal/core/ui/theme/TypeKt;->getDisplayFamily()Landroidx/compose/ui/text/font/FontFamily;
 SPLapp/foscal/core/ui/theme/TypeKt;->getFoscalTypography()Landroidx/compose/material3/Typography;
-SPLapp/foscal/core/ui/theme/TypeKt;->hanken(Landroidx/compose/ui/text/font/FontWeight;)Landroidx/compose/ui/text/font/Font;
+SPLapp/foscal/core/ui/theme/TypeKt;->manrope(Landroidx/compose/ui/text/font/FontWeight;)Landroidx/compose/ui/text/font/Font;
 Lapp/foscal/di/AppModule;
 SPLapp/foscal/di/AppModule;-><clinit>()V
 SPLapp/foscal/di/AppModule;-><init>()V
