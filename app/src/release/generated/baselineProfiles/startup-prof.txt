@@ -18994,7 +18994,7 @@ SPLapp/foscal/core/ui/theme/ThemeKt;->FoscalTheme_Sj8uqqQ$lambda$0(Landroidx/com
 PLapp/foscal/core/ui/theme/ThemeKt;->getLocalIsDarkTheme()Landroidx/compose/runtime/ProvidableCompositionLocal;
 SPLapp/foscal/core/ui/theme/ThemeKt;->lightColorsFor(Lapp/foscal/core/ui/theme/AccentTokens;)Landroidx/compose/material3/ColorScheme;
 SPLapp/foscal/core/ui/theme/ThemeKt;->tokens(Lapp/foscal/core/model/AccentColor;)Lapp/foscal/core/ui/theme/AccentTokens;
-SPLapp/foscal/core/ui/theme/ThemeKt;->weekendLabelColor(ZLandroidx/compose/runtime/Composer;II)J
+SPLapp/foscal/core/ui/theme/ThemeKt;->weekendLabelColor(Landroidx/compose/runtime/Composer;I)J
 Lapp/foscal/core/ui/theme/ThemeKt$$ExternalSyntheticLambda0;
 SPLapp/foscal/core/ui/theme/ThemeKt$$ExternalSyntheticLambda0;-><init>()V
 Lapp/foscal/core/ui/theme/ThemeKt$$ExternalSyntheticLambda1;

@@ -66,6 +66,7 @@ import app.foscal.core.ui.theme.DisplayFamily
 import app.foscal.core.ui.theme.Motion
 import app.foscal.core.ui.theme.onTodayDiscColor
 import app.foscal.core.ui.theme.todayDiscColor
+import app.foscal.core.ui.theme.weekendLabelColor
 import app.foscal.ui.common.pageOnSwipe
 import app.foscal.ui.util.Dates
 import app.foscal.ui.util.LocalUse24HourClock
@@ -484,7 +485,7 @@ private fun WeekHeader(firstDayOfWeek: DayOfWeek, showWeekNumbers: Boolean) {
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = if (index >= 5) {
-                    app.foscal.core.ui.theme.weekendLabelColor()
+                    weekendLabelColor()
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
@@ -560,26 +561,27 @@ private fun DayCell(
     val shape = RoundedCornerShape(12.dp)
     val onSurface = MaterialTheme.colorScheme.onSurface
     val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val accent = MaterialTheme.colorScheme.primary
     // Both of these were animated, and neither could ever animate: AnimatedContent gives each month
     // its own subtree, so a cell's month membership and its today-ness are fixed for its whole
     // lifetime. The animations snapped to their targets on the first frame and charged 42 cells x 2
     // running animations per swipe for the privilege — spent during the exact frames the slide
-    // needs. Today reads as a filled amber disc; a tapped day gets a soft tonal one in the accent,
-    // so the two stop being the same blue and start meaning different things.
+    // needs. One colour, two marks: today is a filled accent disc, a tapped day tints its whole
+    // cell and sets the number in the accent. Both were discs before, which left the difference
+    // resting on two neighbouring tones of the same hue — and under a wallpaper-derived scheme
+    // that tonal disc could land on any washed-out colour the palette happened to hold.
     val dayNumberColor = if (isInFocusedMonth) onSurface else muted
-    val discColor = when {
-        isToday -> todayDiscColor()
-        isSelected -> MaterialTheme.colorScheme.primaryContainer
-        else -> Color.Transparent
-    }
+    val cellTint = if (isSelected) accent.copy(alpha = 0.12f) else Color.Transparent
+    val discColor = if (isToday) todayDiscColor() else Color.Transparent
     val numberColor = when {
         isToday -> onTodayDiscColor()
-        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+        isSelected -> accent
         else -> dayNumberColor
     }
     Box(
         modifier = modifier
             .clip(shape)
+            .background(cellTint)
             .clickable(onClick = onClick),
     ) {
         Column(

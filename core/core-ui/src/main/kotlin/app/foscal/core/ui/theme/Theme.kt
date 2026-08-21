@@ -123,29 +123,20 @@ fun customAccentTokens(seed: Color): AccentTokens = AccentTokens(
     onSecondaryContainerDark = lerp(seed, Color.White, 0.72f),
 )
 
-/**
- * Amber where it is drawn as text rather than as a fill — weekend labels, today's weekday.
- *
- * The light form is the brand amber darkened until it clears 4.5:1 on white. The gold this
- * replaced sat at 2.5:1, which was both off-palette and not actually readable.
- */
+/** Weekend day-of-week label colour: the accent, against the neutral of the other five. */
 @Composable
-fun amberTextColor(darkTheme: Boolean = LocalIsDarkTheme.current): Color =
-    if (darkTheme) AmberTextDark else AmberTextLight
-
-/** Weekend day-of-week label colour. */
-@Composable
-fun weekendLabelColor(darkTheme: Boolean = LocalIsDarkTheme.current): Color =
-    amberTextColor(darkTheme)
+fun weekendLabelColor(): Color = MaterialTheme.colorScheme.primary
 
 /**
  * The filled disc marking today, and the ink on it.
  *
- * Amber rather than the accent, so the icon on the home screen is a literal preview of the app —
- * and so that today stops looking like a selected day, which was the other blue disc.
+ * Whichever accent is in force. This was the brand amber, on the reasoning that it made the
+ * launcher icon a preview of the app; that reasoning does not survive the user choosing a colour,
+ * because the one day always on screen was then the one thing their choice did not reach. Today
+ * and a tapped day are told apart by shape now, not hue: a filled disc against a tinted cell.
  */
 @Composable
-fun todayDiscColor(): Color = FoscalAmber
+fun todayDiscColor(): Color = MaterialTheme.colorScheme.primary
 
 @Composable
-fun onTodayDiscColor(): Color = AmberInk
+fun onTodayDiscColor(): Color = MaterialTheme.colorScheme.onPrimary

@@ -47,7 +47,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.core.model.Event
 import app.foscal.core.ui.theme.DisplayFamily
-import app.foscal.core.ui.theme.amberTextColor
 import app.foscal.core.ui.theme.onTodayDiscColor
 import app.foscal.core.ui.theme.todayDiscColor
 import app.foscal.ui.util.Dates
@@ -323,8 +322,9 @@ private fun AgendaDateGutter(date: LocalDate, isToday: Boolean) {
             text = date.format(rememberDateFormatter("EEE")),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
-            // Amber as text, so the darkened form: the disc colour is 1.5:1 on this surface.
-            color = if (isToday) amberTextColor()
+            // The accent as text under the accent-filled disc, tying the two halves of the gutter
+            // together; the other days keep the muted neutral.
+            color = if (isToday) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
