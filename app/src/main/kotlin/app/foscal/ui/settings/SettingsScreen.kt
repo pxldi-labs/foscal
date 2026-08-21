@@ -1,5 +1,7 @@
 package app.foscal.ui.settings
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.ManagedActivityResultLauncher
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,11 +77,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.BuildConfig
@@ -158,6 +163,8 @@ fun SettingsScreen(
                     item {
                         CalendarStyleSettings(state = eventStyle, viewModel = eventStyleViewModel)
                     }
+                    item { SectionHeader("Home screen widget") }
+                    item { WidgetSettings(state = behaviour, viewModel = behaviourViewModel) }
                 }
                 SettingsSection.Behaviour -> {
                     item { SectionHeader("The calendar") }
@@ -189,7 +196,15 @@ fun SettingsScreen(
                     onEditCalendar = { cal -> viewModel.startEdit(cal.id, cal.displayName, cal.color) },
                     onDeleteCalendar = { cal -> viewModel.confirmDelete(cal.id, cal.displayName) },
                 )
-                SettingsSection.Reminders -> remindersSection(state, viewModel)
+                SettingsSection.Reminders -> remindersSection(
+                    state = state,
+                    viewModel = viewModel,
+                    behaviour = behaviour,
+                    behaviourViewModel = behaviourViewModel,
+                )
+                SettingsSection.Sync -> item {
+                    SyncSettings(calendars = state.items)
+                }
                 SettingsSection.Transfer -> item {
                     ImportExportSection(
                         rows = state.items,
@@ -286,32 +301,14 @@ private fun LazyListScope.appearanceSection(
     state: CalendarsUiState,
     viewModel: CalendarsViewModel,
 ) {
-    // Material You needs a wallpaper-derived palette the platform only exposes from Android 12
-    // on, so on anything older the toggle would be a switch that cannot do anything and is left
-    // out entirely.
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        item {
-            ToggleRow(
-                title = "Use wallpaper colours",
-                subtitle = if (state.dynamicColor) "On" else "Off",
-                checked = state.dynamicColor,
-                onToggle = { viewModel.setDynamicColor(it) },
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-        }
-    }
-    // The accent is what wallpaper colours replace, so showing the picker alongside them would
-    // offer a choice that changes nothing on screen.
-    if (!state.dynamicColor) {
-        item {
-            AccentPicker(
-                selected = state.accentColor,
-                customColor = state.accentCustomColor,
-                onSelectPreset = { viewModel.setAccentColor(it) },
-                onPickCustom = { viewModel.setCustomAccentColor(it) },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
+    item {
+        UiColorPicker(
+            selected = state.uiColor,
+            customColor = state.uiCustomColor,
+            onSelect = { viewModel.setUiColor(it) },
+            onPickCustom = { viewModel.setUiCustomColor(it) },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
     }
     item {
         ThemeModePicker(
@@ -387,13 +384,15 @@ private fun LazyListScope.calendarsSection(
 private fun LazyListScope.remindersSection(
     state: CalendarsUiState,
     viewModel: CalendarsViewModel,
+    behaviour: app.foscal.ui.home.BehaviourState,
+    behaviourViewModel: app.foscal.ui.home.BehaviourViewModel,
 ) {
     item {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Default reminder", style = MaterialTheme.typography.bodyMedium)
+            Text("Timed events", style = MaterialTheme.typography.bodyMedium)
             ReminderChips(
                 selection = state.defaultReminderMinutes
                     ?.let { ReminderSelection.Minutes(it) }
@@ -408,14 +407,68 @@ private fun LazyListScope.remindersSection(
             )
         }
     }
+    item {
+        // Its own default, because the two are not the same question. "15 minutes before" is a
+        // sensible answer for a meeting and a useless one for a birthday: on an all-day event it
+        // fires at 23:45 the night before, which warns nobody about anything.
+        AllDayReminderRow(
+            minutes = behaviour.allDayReminderMinutes,
+            onSelect = behaviourViewModel::setAllDayReminder,
+        )
+    }
     item { ReminderDiagnosticsCard(modifier = Modifier.padding(horizontal = 12.dp)) }
 }
 
+/**
+ * The reminder a new all-day event starts with, phrased as a time of day rather than an offset.
+ *
+ * Nobody thinks "900 minutes before"; they think "the morning before". The stored value is still
+ * minutes before local midnight, which is what the provider understands.
+ */
+@Composable
+private fun AllDayReminderRow(minutes: Int?, onSelect: (Int?) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    if (picking) {
+        ChoiceDialog(
+            title = "All-day events",
+            options = AllDayReminderOptions.map { (value, label) -> (value?.toString() ?: "") to label },
+            selected = minutes?.toString() ?: "",
+            onSelect = {
+                onSelect(it.toIntOrNull())
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
+    }
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("All-day events", style = MaterialTheme.typography.bodyMedium)
+        ValueRow(
+            title = "Remind me",
+            value = AllDayReminderOptions.firstOrNull { it.first == minutes }?.second ?: "None",
+            onClick = { picking = true },
+        )
+    }
+}
+
+/** Offsets measured back from local midnight of the day the event falls on. */
+private val AllDayReminderOptions: List<Pair<Int?, String>> = listOf(
+    null to "None",
+    360 to "The evening before, 18:00",
+    900 to "The morning before, 09:00",
+    1440 to "A day before, midnight",
+    2340 to "Two mornings before, 09:00",
+    10080 to "A week before",
+)
+
 @Composable
 private fun AboutSection() {
+    val context = LocalContext.current
     Column(
         modifier = Modifier.padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // The mark, at the size a launcher icon actually is. About is the one page in the app
         // that is about the app rather than about the calendar, and a version number on its own
@@ -427,13 +480,79 @@ private fun AboutSection() {
                 .padding(bottom = 6.dp)
                 .size(64.dp),
         )
-        Text("Foscal ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
+        Text("Foscal ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleLarge)
         Text(
-            "Foscal doesn't sync by itself. DAVx\u2075 or your account app keeps calendars current.",
-            style = MaterialTheme.typography.bodySmall,
+            "Your events live in the calendars this phone already has. There is no account to " +
+                "make, and nothing leaves the device.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Foscal does not sync on its own. DAVx\u2075, or whichever app owns your account, " +
+                "keeps those calendars up to date; Foscal shows you what they leave behind.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(6.dp))
+
+        // The repository, reachable rather than merely mentioned: this is the one screen where
+        // "open source" should be somewhere you can go, not an adjective.
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { openUrl(context, REPO_URL) }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_github),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(26.dp),
+            )
+            Column {
+                Text(
+                    "Free and open source software",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    REPO_LABEL,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // The Open Font License asks that the fonts be named wherever the app names anything, and
+        // its full text ships beside them in the APK's assets.
+        Text(
+            "Using fonts",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            "Gabarito and Manrope, both under the SIL Open Font License 1.1.",
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+private const val REPO_URL = "https://github.com/pxldi-labs/foscal"
+private const val REPO_LABEL = "github.com/pxldi-labs/foscal"
+
+/**
+ * `resolveActivity` is deliberately not consulted first: package visibility on API 30+ hides
+ * browsers this app has no `<queries>` entry for, so the check reports "nothing can open this"
+ * for links that in fact open fine. Catching the failure covers the genuinely empty case.
+ */
+private fun openUrl(context: Context, url: String) {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
 }
 
 @Composable

@@ -91,7 +91,7 @@ import app.foscal.core.model.AttendeeStatus
 import app.foscal.core.model.Event
 import app.foscal.core.model.MeetingLinks
 import app.foscal.core.model.ReminderDuration
-import app.foscal.core.ui.theme.BricolageFamily
+import app.foscal.core.ui.theme.DisplayFamily
 import app.foscal.core.ui.theme.LocalIsDarkTheme
 import app.foscal.core.ui.theme.Motion
 import app.foscal.location.openInMaps
@@ -747,7 +747,7 @@ private fun Header(event: Event, calendarName: String, accent: Color) {
         }
         Text(
             event.title,
-            style = MaterialTheme.typography.displaySmall.copy(fontFamily = BricolageFamily),
+            style = MaterialTheme.typography.displaySmall.copy(fontFamily = DisplayFamily),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
         )

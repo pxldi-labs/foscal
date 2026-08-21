@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.foscal.core.data.Preferences
 import app.foscal.core.model.DayTapAction
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -25,6 +26,13 @@ data class BehaviourState(
     val monthMinimumMinutes: Int = 0,
     /** Null means new events land on the first visible calendar. */
     val defaultCalendarId: Long? = null,
+    /** Minutes before local midnight that a new all-day event reminds; null is none. */
+    val allDayReminderMinutes: Int? = Preferences.DEFAULT_ALL_DAY_REMINDER_MINUTES,
+    /** Whether events the user has declined still take up space on the grid. */
+    val showDeclinedEvents: Boolean = true,
+    val widgetEventLimit: Int = Preferences.DEFAULT_WIDGET_EVENT_LIMIT,
+    val widgetDetailedRows: Boolean = true,
+    val suggestEventTitles: Boolean = true,
 ) {
     /**
      * The view to actually open on.
@@ -46,6 +54,40 @@ class BehaviourViewModel @Inject constructor(
     private val prefs: Preferences,
 ) : ViewModel() {
 
+    // combine() tops out at five arguments, so the rest are folded in through nested combines
+    // and a holder rather than by splitting the screen's state across two view models.
+    private data class Extras(
+        val tap: DayTapAction,
+        val monthMinimum: Int,
+        val allDayReminder: Int?,
+        val showDeclined: Boolean,
+        val widgetLimit: Int,
+        val widgetDetailed: Boolean,
+        val suggestTitles: Boolean,
+    )
+
+    private val extras: Flow<Extras> = combine(
+        combine(
+            prefs.dayTapAction,
+            prefs.monthMinimumMinutes,
+            prefs.allDayReminderMinutes,
+        ) { tap, monthMinimum, allDay -> Triple(tap, monthMinimum, allDay) },
+        prefs.showDeclinedEvents,
+        prefs.widgetEventLimit,
+        prefs.widgetDetailedRows,
+        prefs.suggestEventTitles,
+    ) { core, declined, widgetLimit, widgetDetailed, suggestTitles ->
+        Extras(
+            tap = core.first,
+            monthMinimum = core.second,
+            allDayReminder = core.third,
+            showDeclined = declined,
+            widgetLimit = widgetLimit,
+            widgetDetailed = widgetDetailed,
+            suggestTitles = suggestTitles,
+        )
+    }
+
     val state: StateFlow<BehaviourState> = combine(
         combine(
             prefs.startView,
@@ -55,10 +97,8 @@ class BehaviourViewModel @Inject constructor(
         prefs.firstDayOfWeek,
         prefs.defaultEventMinutes,
         prefs.showWeekNumbers,
-        // Paired because the outer combine is already at its five-argument overload.
-        combine(prefs.dayTapAction, prefs.monthMinimumMinutes, ::Pair),
-    ) { views, firstDay, minutes, weekNumbers, tapAndMonth ->
-        val (tap, monthMinimum) = tapAndMonth
+        extras,
+    ) { views, firstDay, minutes, weekNumbers, rest ->
         BehaviourState(
             startView = views.first,
             lastUsedView = views.second,
@@ -66,10 +106,35 @@ class BehaviourViewModel @Inject constructor(
             firstDayOfWeek = firstDay,
             defaultEventMinutes = minutes,
             showWeekNumbers = weekNumbers,
-            dayTapAction = tap,
-            monthMinimumMinutes = monthMinimum,
+            dayTapAction = rest.tap,
+            monthMinimumMinutes = rest.monthMinimum,
+            allDayReminderMinutes = rest.allDayReminder,
+            showDeclinedEvents = rest.showDeclined,
+            widgetEventLimit = rest.widgetLimit,
+            widgetDetailedRows = rest.widgetDetailed,
+            suggestEventTitles = rest.suggestTitles,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BehaviourState())
+
+    fun setAllDayReminder(minutes: Int?) {
+        viewModelScope.launch { prefs.setAllDayReminder(minutes) }
+    }
+
+    fun setShowDeclinedEvents(enabled: Boolean) {
+        viewModelScope.launch { prefs.setShowDeclinedEvents(enabled) }
+    }
+
+    fun setWidgetEventLimit(limit: Int) {
+        viewModelScope.launch { prefs.setWidgetEventLimit(limit) }
+    }
+
+    fun setWidgetDetailedRows(enabled: Boolean) {
+        viewModelScope.launch { prefs.setWidgetDetailedRows(enabled) }
+    }
+
+    fun setSuggestEventTitles(enabled: Boolean) {
+        viewModelScope.launch { prefs.setSuggestEventTitles(enabled) }
+    }
 
     /**
      * Records the view on screen so "Last used" has something to resolve to.

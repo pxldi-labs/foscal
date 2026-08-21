@@ -14,9 +14,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.core.data.CalendarPermissionState
 import app.foscal.core.data.Preferences
 import app.foscal.core.data.UserPreferencesRepository
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
+import app.foscal.core.model.UiColor
 import app.foscal.core.ui.theme.FoscalTheme
 import app.foscal.ui.nav.FoscalNavHost
 import app.foscal.ui.util.LocalEventColorStrength
@@ -44,12 +44,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val onboardingDone by prefs.onboardingCompleted
                 .collectAsStateWithLifecycle(initialValue = null)
-            val accent by prefs.accentColor
-                .collectAsStateWithLifecycle(initialValue = AccentColor.Default)
-            val customAccent by prefs.accentCustomColor
-                .collectAsStateWithLifecycle(initialValue = AccentColor.DEFAULT_CUSTOM_COLOR)
-            val dynamicColor by prefs.dynamicColor
-                .collectAsStateWithLifecycle(initialValue = false)
+            val uiColor by prefs.uiColor
+                .collectAsStateWithLifecycle(initialValue = UiColor.Default)
+            val uiCustomColor by prefs.uiCustomColor
+                .collectAsStateWithLifecycle(initialValue = UiColor.DEFAULT_CUSTOM_COLOR)
             val themeMode by prefs.themeMode
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.Default)
             val use24Hour by prefs.use24HourClock
@@ -68,9 +66,8 @@ class MainActivity : ComponentActivity() {
             }
             FoscalTheme(
                 darkTheme = darkTheme,
-                dynamicColor = dynamicColor,
-                accent = accent,
-                customSeed = androidx.compose.ui.graphics.Color(customAccent),
+                uiColor = uiColor,
+                customSeed = androidx.compose.ui.graphics.Color(uiCustomColor),
             ) {
                 CompositionLocalProvider(
                     LocalUse24HourClock provides use24Hour,

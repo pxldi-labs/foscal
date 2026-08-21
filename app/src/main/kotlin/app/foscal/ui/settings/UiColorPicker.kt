@@ -1,5 +1,6 @@
 package app.foscal.ui.settings
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -27,52 +28,67 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.foscal.core.model.AccentColor
+import app.foscal.core.model.UiColor
+import app.foscal.core.ui.theme.CobaltAccent
 import app.foscal.core.ui.theme.LocalIsDarkTheme
-import app.foscal.core.ui.theme.tokens
 
 /**
- * Accent selector shared by Settings and onboarding: the three presets plus a "Custom" swatch that
- * opens a color picker. Selecting a preset calls [onSelectPreset]; confirming the picker calls
- * [onPickCustom] with the chosen ARGB.
+ * Where the app's chrome gets its colour: the system's, Foscal's own, or one you pick.
+ *
+ * Three swatches rather than a palette of presets. The colours that carry meaning in a calendar
+ * belong to the calendars and their events; this is only about the frame around them, and a frame
+ * needs one answer, not six.
  */
 @Composable
-fun AccentPicker(
-    selected: AccentColor,
+fun UiColorPicker(
+    selected: UiColor,
     customColor: Int,
-    onSelectPreset: (AccentColor) -> Unit,
+    onSelect: (UiColor) -> Unit,
     onPickCustom: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    // Null where the surrounding card already names the setting, so it isn't labelled twice.
-    label: String? = "Accent colour",
 ) {
     val dark = LocalIsDarkTheme.current
     var showPicker by remember { mutableStateOf(false) }
-    val presets = listOf(
-        AccentColor.COBALT to "Cobalt",
-        AccentColor.VIOLET to "Violet",
-        AccentColor.FOREST to "Forest",
-    )
+    // Material You needs a wallpaper-derived palette the platform only exposes from Android 12 on.
+    // Below that the swatch would be a choice that changes nothing, so it is not offered — and a
+    // preference stored on a newer phone still falls back to Foscal's blue when read here.
+    val systemAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (label != null) Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text("Main colour", style = MaterialTheme.typography.bodyMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            presets.forEach { (accent, label) ->
-                val tokens = accent.tokens()
-                AccentSwatch(
-                    color = if (dark) tokens.primaryDark else tokens.primaryLight,
-                    label = label,
-                    selected = accent == selected,
-                    onClick = { onSelectPreset(accent) },
+            if (systemAvailable) {
+                Swatch(
+                    color = MaterialTheme.colorScheme.primary,
+                    label = "System",
+                    selected = selected == UiColor.SYSTEM,
+                    rainbowRing = selected != UiColor.SYSTEM,
+                    onClick = { onSelect(UiColor.SYSTEM) },
                 )
             }
-            AccentSwatch(
+            Swatch(
+                color = if (dark) CobaltAccent.primaryDark else CobaltAccent.primaryLight,
+                label = "Foscal",
+                selected = selected == UiColor.FOSCAL || (!systemAvailable && selected == UiColor.SYSTEM),
+                onClick = { onSelect(UiColor.FOSCAL) },
+            )
+            Swatch(
                 color = Color(customColor),
                 label = "Custom",
-                selected = selected == AccentColor.CUSTOM,
+                selected = selected == UiColor.CUSTOM,
                 rainbowRing = true,
                 onClick = { showPicker = true },
             )
         }
+        Text(
+            when {
+                selected == UiColor.SYSTEM && systemAvailable -> "Taken from your wallpaper"
+                selected == UiColor.CUSTOM -> "A colour you picked"
+                else -> "Foscal's own blue"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 
     if (showPicker) {
@@ -88,7 +104,7 @@ fun AccentPicker(
 }
 
 @Composable
-private fun AccentSwatch(
+private fun Swatch(
     color: Color,
     label: String,
     selected: Boolean,

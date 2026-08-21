@@ -17,6 +17,32 @@ object CalendarColors {
     )
 
     fun pick(index: Int): Int = presets[index % presets.size]
+
+    /**
+     * What each preset is called.
+     *
+     * A swatch you can only point at is a colour you cannot talk about, or check at a glance when
+     * two of them are close. Named after the thing rather than the hue ("Poppy", not "Red 600"),
+     * which is how people describe a colour to each other.
+     */
+    private val names = mapOf(
+        presets[0] to "Cobalt",
+        presets[1] to "Cerise",
+        presets[2] to "Fern",
+        presets[3] to "Tangerine",
+        presets[4] to "Amethyst",
+        presets[5] to "Teal",
+        presets[6] to "Poppy",
+        presets[7] to "Cocoa",
+    )
+
+    /**
+     * The name of [colorArgb], or null when it is not one of ours.
+     *
+     * A colour synced down from a server is whatever that server chose, and inventing a name for it
+     * would be a guess presented as a fact.
+     */
+    fun nameOf(colorArgb: Int): String? = names[colorArgb]
 }
 
 fun Int.toComposeColor(): Color = Color(this)

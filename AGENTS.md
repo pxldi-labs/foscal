@@ -169,21 +169,29 @@ The visual identity ("the Foscal voice") is derived from the Claude Design
 project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-system:
 
 - **Typography** — two variable fonts bundled in `core/core-ui/src/main/res/font`:
-  **Bricolage Grotesque** (display/voice: date numerals, month header, screen
-  titles, event-detail title) and **Hanken Grotesque** (all body/UI). Wired via
+  **Gabarito** (display/voice: date numerals, month header, screen titles,
+  event-detail title) and **Manrope** (all body/UI). Wired via
   `core-ui/.../theme/Type.kt` → `FoscalTypography`; display+headline styles
-  are Bricolage, everything else Hanken. Reach for `BricolageFamily` directly
-  only for numerals/headers that need the voice.
-- **Accent** — Cobalt `#1A73E8` (`FoscalBlue`) is the default, driving today,
-  selection, buttons and the FAB. Users can switch to **Violet**, **Forest**, or a
-  custom ARGB color in onboarding or Settings; the choice persists via
-  `Preferences.accentColor`, with `Preferences.accentCustomColor` storing the
-  custom seed. Fixed per-accent tokens live in `theme/Color.kt` (`AccentTokens`);
-  custom colors are expanded by `customAccentTokens(seed)` in `Theme.kt`.
-  Never hardcode the accent — read `colorScheme.primary`. `Preferences.dynamicColor`
-  (off by default) swaps the whole scheme for a wallpaper-derived Material You one;
-  Settings shows the toggle and the accent picker mutually exclusively, and renders the
-  toggle only on API 31+ — the platform has no dynamic scheme to read below it.
+  are `DisplayFamily`, everything else `UiFamily`. Reach for `DisplayFamily`
+  directly only for numerals/headers that need the voice. Both are SIL Open
+  Font License 1.1 — **a font swap is not done until `OFL-<Face>.txt` sits in
+  `core/core-ui/src/main/assets/licenses/` and the face is named in Settings →
+  About and the README.** The licence requires its text to travel with the
+  font, which means inside the APK, not just in the repo. The widget's XML
+  layouts name the font resources directly (`@font/gabarito_variable`), so a
+  rename has to reach `app/src/main/res/layout/widget_*.xml` too, and the checked-in baseline
+  profiles (`app/src/release/generated/baselineProfiles/*.txt`) name the generated methods by
+  signature — a rule that no longer resolves is silently dropped, so a rename quietly costs the
+  startup coverage it was there to buy.
+- **Colour** — one setting, `Preferences.uiColor` (`UiColor.SYSTEM` / `FOSCAL` / `CUSTOM`),
+  defaulting to SYSTEM. There is deliberately **no palette of preset hues**: the colours that
+  carry meaning belong to the calendars and their events, and the old Cobalt/Violet/Forest
+  picker competed with them. SYSTEM is Material You; FOSCAL is `CobaltAccent` in
+  `theme/Color.kt`, the one remaining `AccentTokens` set; CUSTOM expands a single seed
+  (`Preferences.uiCustomColor`) through `customAccentTokens(seed)`. Cobalt is also the floor
+  below API 31, where the platform has no dynamic scheme to read, so a stored SYSTEM still
+  draws. Never hardcode the accent: read `colorScheme.primary`, which is the whole reason the
+  app re-tints correctly under all three.
 - **Weekend labels** — use `weekendLabelColor()` from the theme (theme-aware gold),
   never a hardcoded value.
 - **Locale** — in composables read `currentLocale()` (`ui/util/Locales.kt`) or
@@ -378,6 +386,23 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
 - **Timeline headers must use `TimelineGutterWidth` / `TimelineEndInset`.** Any weekday strip drawn
   above a `TimelineLayout` shares those two values or its columns drift out of alignment with the
   grid columns below; the error accumulates across the week and shows up on the last day.
+- **`DrawScope.drawLine`, `drawCircle` and `Stroke` take pixels, not dp.** A literal `0.5f` is half
+  a *physical* pixel — 0.19 dp on a 420 dpi phone, and thinner still on a sharper one, so the line
+  gets fainter as the screen gets better. The hour grid shipped that way for months and read as
+  "too subtle" rather than as a bug. Always write `SomeWidth.dp.toPx()`; the named widths for the
+  grid live at the top of `Timeline.kt`.
+- **Hour labels are centred on their line by *baseline*, not by their box.** A line of text is not
+  vertically symmetrical — the box around it carries descender room the digits never use — so
+  centring the box leaves the digits sitting visibly high, and a fixed-height box also clips any
+  face whose line box is taller than it (Manrope's is 1.37 em, which is what broke the first
+  attempt). `Modifier.centredOnHourLine()` measures the text's own `FirstBaseline` and lifts it by
+  half a cap height. Midnight is deliberately unlabelled, because half of "00:00" would fall above
+  the top edge of the grid, and the "now" label uses the same rule so the two stay comparable;
+  `NowLabelClearance` keeps them from printing over each other.
+- **The gutter's type size is capped in dp (`HourLabelMaxSize`).** `TimelineGutterWidth` is fixed
+  and every column is measured off it, so at a large system font scale "16:00" wraps and the ruler
+  becomes a stack of broken times. The cap is a width constraint expressed as type, not an opinion
+  about accessibility — the rest of the app scales normally.
 - **A null `Preferences.defaultReminderMinutes` means "None", not "unset".** DataStore cannot hold
   a null Int, so the stored sentinel is `-1`; the flow resolves an *absent* key to the built-in
   15-minute default itself. A caller writing `?: 15` therefore re-adds the exact alarm the user
@@ -554,6 +579,9 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
 
 ## Conventions
 
+- **No em dashes in anything the user reads.** Screen copy, dialog text, notification text, store
+  listing: use a full stop, a comma or a colon instead. The house style survived the whole app
+  having exactly one of them; keep it that way.
 - Kotlin only (no Java sources).
 - Follow Material 3 in Compose. Theme lives in `:core-ui`.
 - No comments unless they explain *why* something non-obvious is done.

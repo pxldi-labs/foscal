@@ -47,6 +47,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -54,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.foscal.core.model.Event
@@ -101,6 +105,60 @@ private val MinBlockHeight = 16.dp
 
 /** How close the current time has to be to an hour before that hour's label steps aside. */
 private val NowLabelClearance = 16.dp
+
+/** The gutter's type size, shared by the hour labels and the current-time label. */
+private val HourLabelSize = 11.sp
+
+/**
+ * The largest the gutter's type may actually get, whatever the reader's font scale says.
+ *
+ * The gutter is a fixed [TimelineGutterWidth], and every column of the grid is measured off it, so
+ * it cannot grow. Past about a third larger, "16:00" no longer fits on one line and the ruler
+ * turns into a stack of broken times. Expressed in dp because that is what the constraint is: a
+ * width in dp, not a preference about text.
+ */
+private val HourLabelMaxSize = 14.dp
+
+/**
+ * Cap height as a fraction of font size — near enough for any grotesque, and the reason the label
+ * is placed by its baseline rather than by its box.
+ *
+ * A line of text is not vertically symmetrical: the box around it carries descender room that the
+ * digits never use, so centring the *box* on a line leaves the digits sitting visibly high. What
+ * has to straddle the line is the middle of the digits themselves, which is half a cap height
+ * above the baseline.
+ */
+private const val CapHeightRatio = 0.72f
+
+/**
+ * Grid line widths, in dp — which is the whole point of naming them.
+ *
+ * `DrawScope.drawLine` takes **pixels**, so the `0.5f` that used to be here was half a physical
+ * pixel: 0.19 dp on a 420 dpi phone, a third of the hairline it was meant to be, and most of what
+ * survived was then spent on antialiasing. A ruler has to be the same weight on every screen.
+ */
+private val HourLineWidth = 1.dp
+private val NowLineWidth = 1.5.dp
+private val NowDotRadius = 3.dp
+
+/**
+ * Places a gutter label so the middle of its digits lands on the line, instead of its box.
+ *
+ * Measured from the text's own baseline, so it holds whatever the type is and however the reader
+ * has scaled it — the previous version put the label in a fixed-height box, which centred the
+ * wrong thing and clipped the descenders of any face whose line box was taller than the box.
+ */
+private fun Modifier.centredOnHourLine(fontSize: TextUnit): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val baseline = placeable[FirstBaseline]
+        val shift = if (baseline == AlignmentLine.Unspecified) {
+            placeable.height / 2
+        } else {
+            baseline - (fontSize.toPx() * CapHeightRatio / 2f).roundToInt()
+        }
+        layout(placeable.width, placeable.height) { placeable.place(0, -shift) }
+    }
 
 val TimelineEndInset = 4.dp
 
@@ -212,10 +270,11 @@ fun TimelineLayout(
     // The hour lines are a ruler, not a border: they only have to be findable when you look for
     // them. A solid outline colour turns the grid into the loudest thing on an empty day. Ink in
     // light, white in dark — a dark grey line on a dark background reads as dirt.
-    val hourLineColor = if (LocalIsDarkTheme.current) {
+    val darkTheme = LocalIsDarkTheme.current
+    val hourLineColor = if (darkTheme) {
         Color.White.copy(alpha = 0.17f)
     } else {
-        Color.Black.copy(alpha = 0.11f)
+        Color.Black.copy(alpha = 0.12f)
     }
     val nowColor = MaterialTheme.colorScheme.error
     val todayTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
@@ -228,6 +287,9 @@ fun TimelineLayout(
     val is24Hour = LocalUse24HourClock.current
     val locale = currentLocale()
     val nowLabelFmt = remember(is24Hour, locale) { timeFormatter(is24Hour, locale) }
+    val hourLabelSize = with(density) {
+        minOf(HourLabelSize.toPx(), HourLabelMaxSize.toPx()).toSp()
+    }
     var selection by remember { mutableStateOf<TimeSelection?>(null) }
     // Where a tap has parked a new-event block, waiting for a second tap to open the editor. Held
     // here rather than in the day column so tapping another day moves the one block instead of
@@ -300,31 +362,36 @@ fun TimelineLayout(
                         .height(totalHeight)
                         .padding(end = TimelineEndInset),
                 ) {
-                    Column(Modifier.width(TimelineGutterWidth)) {
-                        for (h in 0..23) {
-                            Box(
-                                Modifier
-                                    .height(hourHeight)
-                                    .fillMaxWidth(),
-                                contentAlignment = Alignment.TopEnd,
-                            ) {
-                                // The hour gives way to the current time when the two would land
-                                // on each other. "12:07" printed over "12:00" is unreadable, and
-                                // of the two the one you already know is the hour.
-                                val eclipsed = showNowLabel &&
-                                    hourHeight * abs(nowFractionalHour - h) < NowLabelClearance
-                                if (!eclipsed) {
-                                    Text(
-                                        // The whole time, not just the hour. "05" beside a grid
-                                        // line is a label you have to decode; "05:00" is one you
-                                        // read.
-                                        "${"%02d".format(h)}:00",
-                                        modifier = Modifier.padding(end = 10.dp),
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
+                    // The label names a line, so it straddles one: each is centred on its hour
+                    // rather than hung off the top of the hour's box, which is where it used to
+                    // sit and why every time read about half a text-height low. Midnight goes
+                    // unlabelled — half of "00:00" would be above the top edge of the grid, and a
+                    // label cut in half is worse than no label at all.
+                    Box(
+                        Modifier
+                            .width(TimelineGutterWidth)
+                            .fillMaxHeight(),
+                    ) {
+                        for (h in 1..23) {
+                            // The hour gives way to the current time when the two would land
+                            // on each other. "12:07" printed over "12:00" is unreadable, and
+                            // of the two the one you already know is the hour.
+                            val eclipsed = showNowLabel &&
+                                hourHeight * abs(nowFractionalHour - h) < NowLabelClearance
+                            if (eclipsed) continue
+                            Text(
+                                // The whole time, not just the hour. "05" beside a grid line
+                                // is a label you have to decode; "05:00" is one you read.
+                                "${"%02d".format(h)}:00",
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(y = hourHeight * h)
+                                    .centredOnHourLine(hourLabelSize)
+                                    .padding(end = 10.dp),
+                                fontSize = hourLabelSize,
+                                maxLines = 1,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                     timedDays.forEachIndexed { dayIndex, day ->
@@ -439,12 +506,13 @@ fun TimelineLayout(
                             val colWidth = maxWidth
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val hourPx = hourHeight.toPx()
+                                val strokePx = HourLineWidth.toPx()
                                 for (h in 1..23) {
                                     drawLine(
                                         color = hourLineColor,
                                         start = Offset(0f, h * hourPx),
                                         end = Offset(size.width, h * hourPx),
-                                        strokeWidth = 0.5f,
+                                        strokeWidth = strokePx,
                                     )
                                 }
                             }
@@ -596,11 +664,11 @@ fun TimelineLayout(
                                         color = nowColor,
                                         start = Offset(0f, nowY),
                                         end = Offset(size.width, nowY),
-                                        strokeWidth = 1.5f,
+                                        strokeWidth = NowLineWidth.toPx(),
                                     )
                                     drawCircle(
                                         color = nowColor,
-                                        radius = 4.5f,
+                                        radius = NowDotRadius.toPx(),
                                         center = Offset(0f, nowY),
                                     )
                                 }
@@ -613,8 +681,8 @@ fun TimelineLayout(
                 if (showNowLabel) {
                     Box(
                         Modifier
-                            .width(54.dp)
-                            .offset(y = hourHeight * nowFractionalHour - 8.dp),
+                            .width(TimelineGutterWidth)
+                            .offset(y = hourHeight * nowFractionalHour),
                         contentAlignment = Alignment.CenterEnd,
                     ) {
                         // Coloured text, not a filled chip. The chip was the loudest thing on a
@@ -622,9 +690,12 @@ fun TimelineLayout(
                         // the user can also read off the clock in their status bar.
                         Text(
                             nowZ.format(nowLabelFmt),
-                            modifier = Modifier.padding(end = 10.dp),
+                            modifier = Modifier
+                                .centredOnHourLine(hourLabelSize)
+                                .padding(end = 10.dp),
                             color = nowColor,
-                            fontSize = 11.sp,
+                            fontSize = hourLabelSize,
+                            maxLines = 1,
                             fontWeight = FontWeight.Bold,
                         )
                     }

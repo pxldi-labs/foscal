@@ -21,7 +21,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/widget_subtitle"
-            android:fontFamily="@font/hanken_grotesque_variable"
+            android:fontFamily="@font/manrope_variable"
             android:textFontWeight="600"
             android:textSize="11sp"
             android:singleLine="true" />
@@ -31,7 +31,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/widget_title"
-            android:fontFamily="@font/bricolage_grotesque_variable"
+            android:fontFamily="@font/gabarito_variable"
             android:textFontWeight="700"
             android:textSize="19sp"
             android:singleLine="true" />
@@ -60,7 +60,7 @@
             android:layout_height="wrap_content"
             android:textColor="@color/widget_title"
             android:textSize="15sp"
-            android:fontFamily="@font/hanken_grotesque_variable"
+            android:fontFamily="@font/manrope_variable"
             android:textFontWeight="700"
             android:singleLine="true"
             android:ellipsize="end" />
@@ -71,7 +71,7 @@
             android:layout_height="wrap_content"
             android:textColor="@color/widget_subtitle"
             android:textSize="13sp"
-            android:fontFamily="@font/hanken_grotesque_variable"
+            android:fontFamily="@font/manrope_variable"
             android:singleLine="true"
             android:ellipsize="end" />
     </LinearLayout>

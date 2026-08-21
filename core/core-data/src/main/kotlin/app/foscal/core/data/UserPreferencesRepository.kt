@@ -8,11 +8,11 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.CalendarReminderDefaults
 import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
+import app.foscal.core.model.UiColor
 import java.time.DayOfWeek
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -52,14 +52,11 @@ class UserPreferencesRepository @Inject constructor(
             CalendarReminderDefaults.decode(prefs[CALENDAR_REMINDERS].orEmpty())
         }
 
-    override val accentColor: Flow<AccentColor> =
-        context.dataStore.data.map { AccentColor.fromKey(it[ACCENT_COLOR]) }
+    override val uiColor: Flow<UiColor> =
+        context.dataStore.data.map { UiColor.fromKey(it[UI_COLOR]) }
 
-    override val accentCustomColor: Flow<Int> =
-        context.dataStore.data.map { it[ACCENT_CUSTOM_COLOR] ?: AccentColor.DEFAULT_CUSTOM_COLOR }
-
-    override val dynamicColor: Flow<Boolean> =
-        context.dataStore.data.map { it[DYNAMIC_COLOR] ?: false }
+    override val uiCustomColor: Flow<Int> =
+        context.dataStore.data.map { it[UI_CUSTOM_COLOR] ?: UiColor.DEFAULT_CUSTOM_COLOR }
 
     override val themeMode: Flow<ThemeMode> =
         context.dataStore.data.map { ThemeMode.fromKey(it[THEME_MODE]) }
@@ -90,6 +87,31 @@ class UserPreferencesRepository @Inject constructor(
 
     override val showWeekNumbers: Flow<Boolean> =
         context.dataStore.data.map { it[SHOW_WEEK_NUMBERS] ?: false }
+
+    // The same sentinel the timed default uses: DataStore cannot hold a null Int, so -1 is how
+    // "the user chose None" is stored, and an absent key is "never asked, use the built-in".
+    override val allDayReminderMinutes: Flow<Int?> =
+        context.dataStore.data.map { prefs ->
+            when (val stored = prefs[ALL_DAY_REMINDER]) {
+                null -> Preferences.DEFAULT_ALL_DAY_REMINDER_MINUTES
+                -1 -> null
+                else -> stored
+            }
+        }
+
+    override val showDeclinedEvents: Flow<Boolean> =
+        context.dataStore.data.map { it[SHOW_DECLINED] ?: true }
+
+    override val widgetEventLimit: Flow<Int> =
+        context.dataStore.data.map {
+            it[WIDGET_EVENT_LIMIT]?.coerceIn(0, 20) ?: Preferences.DEFAULT_WIDGET_EVENT_LIMIT
+        }
+
+    override val widgetDetailedRows: Flow<Boolean> =
+        context.dataStore.data.map { it[WIDGET_DETAILED_ROWS] ?: true }
+
+    override val suggestEventTitles: Flow<Boolean> =
+        context.dataStore.data.map { it[SUGGEST_TITLES] ?: true }
 
     override val dayTapAction: Flow<DayTapAction> =
         context.dataStore.data.map { DayTapAction.fromName(it[DAY_TAP_ACTION]) }
@@ -160,16 +182,12 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
-    override suspend fun setAccentColor(accent: AccentColor) {
-        context.dataStore.edit { prefs -> prefs[ACCENT_COLOR] = accent.key }
+    override suspend fun setUiColor(color: UiColor) {
+        context.dataStore.edit { prefs -> prefs[UI_COLOR] = color.key }
     }
 
-    override suspend fun setAccentCustomColor(color: Int) {
-        context.dataStore.edit { prefs -> prefs[ACCENT_CUSTOM_COLOR] = color }
-    }
-
-    override suspend fun setDynamicColor(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[DYNAMIC_COLOR] = enabled }
+    override suspend fun setUiCustomColor(color: Int) {
+        context.dataStore.edit { prefs -> prefs[UI_CUSTOM_COLOR] = color }
     }
 
     override suspend fun setThemeMode(mode: ThemeMode) {
@@ -194,6 +212,26 @@ class UserPreferencesRepository @Inject constructor(
 
     override suspend fun setShowWeekNumbers(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[SHOW_WEEK_NUMBERS] = enabled }
+    }
+
+    override suspend fun setAllDayReminder(minutes: Int?) {
+        context.dataStore.edit { prefs -> prefs[ALL_DAY_REMINDER] = minutes ?: -1 }
+    }
+
+    override suspend fun setShowDeclinedEvents(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[SHOW_DECLINED] = enabled }
+    }
+
+    override suspend fun setWidgetEventLimit(limit: Int) {
+        context.dataStore.edit { prefs -> prefs[WIDGET_EVENT_LIMIT] = limit.coerceIn(0, 20) }
+    }
+
+    override suspend fun setWidgetDetailedRows(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[WIDGET_DETAILED_ROWS] = enabled }
+    }
+
+    override suspend fun setSuggestEventTitles(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[SUGGEST_TITLES] = enabled }
     }
 
     override suspend fun setDayTapAction(action: DayTapAction) {
@@ -235,9 +273,8 @@ class UserPreferencesRepository @Inject constructor(
         private val MONTH_MINIMUM_MINUTES = intPreferencesKey("month_minimum_minutes")
         private val DEFAULT_REMINDER = intPreferencesKey("default_reminder_minutes")
         private val CALENDAR_REMINDERS = stringSetPreferencesKey("calendar_reminder_defaults")
-        private val ACCENT_COLOR = stringPreferencesKey("accent_color")
-        private val ACCENT_CUSTOM_COLOR = intPreferencesKey("accent_custom_color")
-        private val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        private val UI_COLOR = stringPreferencesKey("ui_color")
+        private val UI_CUSTOM_COLOR = intPreferencesKey("ui_custom_color")
         private val THEME_MODE = stringPreferencesKey("theme_mode")
         private val USE_24H_CLOCK = booleanPreferencesKey("use_24h_clock")
         private val OSM_MAPS_ENABLED = booleanPreferencesKey("osm_maps_enabled")
@@ -246,6 +283,11 @@ class UserPreferencesRepository @Inject constructor(
         private val FIRST_DAY_OF_WEEK = intPreferencesKey("first_day_of_week")
         private val DEFAULT_EVENT_MINUTES = intPreferencesKey("default_event_minutes")
         private val SHOW_WEEK_NUMBERS = booleanPreferencesKey("show_week_numbers")
+        private val ALL_DAY_REMINDER = intPreferencesKey("all_day_reminder_minutes")
+        private val SHOW_DECLINED = booleanPreferencesKey("show_declined_events")
+        private val WIDGET_EVENT_LIMIT = intPreferencesKey("widget_event_limit")
+        private val WIDGET_DETAILED_ROWS = booleanPreferencesKey("widget_detailed_rows")
+        private val SUGGEST_TITLES = booleanPreferencesKey("suggest_event_titles")
         private val DAY_TAP_ACTION = stringPreferencesKey("day_tap_action")
         private val DEFAULT_CALENDAR_ID = longPreferencesKey("default_calendar_id")
         private val EVENT_COLOR_STRENGTH = stringPreferencesKey("event_color_strength")

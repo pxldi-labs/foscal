@@ -1,9 +1,9 @@
 package app.foscal.core.data
 
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
+import app.foscal.core.model.UiColor
 import kotlinx.coroutines.flow.Flow
 import java.time.DayOfWeek
 
@@ -51,16 +51,18 @@ interface Preferences {
      * combine this with [defaultReminderMinutes].
      */
     val calendarReminderDefaults: Flow<Map<Long, Int?>>
-    val accentColor: Flow<AccentColor>
-    /** ARGB seed color used when [accentColor] is [AccentColor.CUSTOM]. */
-    val accentCustomColor: Flow<Int>
     /**
-     * Whether to derive the color scheme from the system wallpaper (Material You) instead of
-     * [accentColor]. Off by default: Foscal's own accent is part of its visual identity, and the
-     * platform only supplies a dynamic scheme from Android 12 on, so on older releases this has
-     * nothing to read and is never offered.
+     * Where the app's own chrome takes its colour from.
+     *
+     * [UiColor.SYSTEM] by default. A calendar's colours belong to its calendars and its events; a
+     * UI that also insists on a hue of its own is competing with the thing it exists to show, so
+     * the safe default is to let the wallpaper decide. The other two answers are Foscal's own blue
+     * and one colour the user picked.
      */
-    val dynamicColor: Flow<Boolean>
+    val uiColor: Flow<UiColor>
+
+    /** The ARGB seed used when [uiColor] is [UiColor.CUSTOM]. */
+    val uiCustomColor: Flow<Int>
     val themeMode: Flow<ThemeMode>
     val use24HourClock: Flow<Boolean>
 
@@ -91,6 +93,45 @@ interface Preferences {
 
     /** Whether the month grid shows ISO week numbers down its left edge. */
     val showWeekNumbers: Flow<Boolean>
+
+    /**
+     * The reminder a new **all-day** event starts with, in minutes before local midnight of the
+     * day it falls on. Null means none.
+     *
+     * Separate from [defaultReminderMinutes] because the two are not the same question. "15
+     * minutes before" is a sensible answer for a meeting and a useless one for a birthday: it
+     * fires at 23:45 the night before, which is neither a warning nor a reminder. All-day events
+     * are answered in hours before midnight, so 900 is 09:00 the previous morning.
+     */
+    val allDayReminderMinutes: Flow<Int?>
+
+    /**
+     * Whether an event the user has declined still appears on the grid.
+     *
+     * On by default: a declined meeting is still something that happens, and a calendar that
+     * silently drops events is a calendar you cannot trust. Turning it off is for people who have
+     * decided that "no" means gone.
+     */
+    val showDeclinedEvents: Flow<Boolean>
+
+    /** How many of a day's events the agenda widget lists; 0 is all of them. */
+    val widgetEventLimit: Flow<Int>
+
+    /**
+     * Whether the widget's rows carry the end time and the location as well as the start.
+     *
+     * On by default, which is what the widget has always done. Turning it off leaves the start
+     * time alone on the second line, which is the version that reads at arm's length.
+     */
+    val widgetDetailedRows: Flow<Boolean>
+
+    /**
+     * Whether the editor suggests titles the user has typed before.
+     *
+     * The same offline lookup as the location suggestions: their own past events, on this phone,
+     * with nothing sent anywhere.
+     */
+    val suggestEventTitles: Flow<Boolean>
 
     /** What tapping a day header in Week or 3 Days does. */
     val dayTapAction: Flow<DayTapAction>
@@ -138,11 +179,21 @@ interface Preferences {
     /** Overrides the default for one calendar; [minutes] of null means "None on this calendar". */
     suspend fun setCalendarReminderDefault(calendarId: Long, minutes: Int?)
 
+    suspend fun setAllDayReminder(minutes: Int?)
+
+    suspend fun setShowDeclinedEvents(enabled: Boolean)
+
+    suspend fun setWidgetEventLimit(limit: Int)
+
+    suspend fun setWidgetDetailedRows(enabled: Boolean)
+
+    suspend fun setSuggestEventTitles(enabled: Boolean)
+
     /** Drops [calendarId]'s override so it follows [defaultReminderMinutes] again. */
     suspend fun clearCalendarReminderDefault(calendarId: Long)
-    suspend fun setAccentColor(accent: AccentColor)
-    suspend fun setAccentCustomColor(color: Int)
-    suspend fun setDynamicColor(enabled: Boolean)
+    suspend fun setUiColor(color: UiColor)
+
+    suspend fun setUiCustomColor(color: Int)
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setUse24HourClock(use24Hour: Boolean)
     suspend fun setOsmMapsEnabled(enabled: Boolean)
@@ -159,6 +210,18 @@ interface Preferences {
     companion object {
         /** Reminder offset a brand-new install pre-fills on events. */
         const val DEFAULT_REMINDER_MINUTES = 15
+
+        /**
+         * 09:00 the day before, which is when someone can still act on "it is Ana's birthday
+         * tomorrow" — buy the card, book the table, move the morning.
+         */
+        const val DEFAULT_ALL_DAY_REMINDER_MINUTES = 900
+
+        /**
+         * All of them. A cap is a choice about a home screen the app cannot see the size of, and
+         * a widget that hides Thursday's third event is worse than one that scrolls.
+         */
+        const val DEFAULT_WIDGET_EVENT_LIMIT = 0
 
         /** An hour, the length most calendar apps assume and most meetings actually are. */
         const val DEFAULT_EVENT_MINUTES = 60

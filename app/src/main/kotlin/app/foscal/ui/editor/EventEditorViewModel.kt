@@ -52,6 +52,8 @@ data class EditorUiState(
     val location: String = "",
     /** Distinct locations from the user's history, for the editor's offline autocomplete. */
     val recentLocations: List<String> = emptyList(),
+    /** Distinct titles from the user's history; empty when the suggestion setting is off. */
+    val recentTitles: List<String> = emptyList(),
     /** Whether the opt-in OpenStreetMap "Pick on map" button should be offered. */
     val mapsEnabled: Boolean = false,
     val description: String = "",
@@ -90,11 +92,24 @@ data class EditorUiState(
      * device zone and shift it for every other client.
      */
     val originalTimezone: String? = null,
+    /**
+     * The zone [startTime] and [endTime] are written in, which is not always the phone's.
+     *
+     * An event authored elsewhere is edited in the zone it was authored in: showing a New York
+     * meeting as 15:00 because the phone is in Berlin makes every field disagree with the invitation
+     * it came from. Changing this keeps the wall clock the user typed and moves the instant, which
+     * is what "this meeting is 09:00 in New York" means.
+     */
+    val timezone: ZoneId = ZoneId.systemDefault(),
     val saving: Boolean = false,
     val finished: Boolean = false,
     val scopePrompt: RecurrenceScopePrompt? = null,
 ) {
     val canSave: Boolean get() = title.isNotBlank() && selectedCalendarId != null && !saving
+
+    /** Whether the event is anchored somewhere other than where the phone is. */
+    val timezoneDiffers: Boolean
+        get() = !allDay && timezone.rules != ZoneId.systemDefault().rules
 
     /**
      * Whether the guest list on this event is the user's to change.
@@ -148,6 +163,7 @@ class EventEditorViewModel @Inject constructor(
      * defaults out of order.
      */
     private var globalReminderDefault: Int? = null
+    private var allDayReminderDefault: Int? = null
     private var calendarReminderDefaults: Map<Long, Int?> = emptyMap()
 
     private val _state = MutableStateFlow(EditorUiState())
@@ -188,10 +204,16 @@ class EventEditorViewModel @Inject constructor(
         viewModelScope.launch {
             val hidden = prefs.hiddenCalendarIds.first()
             globalReminderDefault = prefs.defaultReminderMinutes.first()
+            allDayReminderDefault = prefs.allDayReminderMinutes.first()
             calendarReminderDefaults = prefs.calendarReminderDefaults.first()
             val calendars = repository.getCalendars()
             val visible = calendars.filter { it.visible && it.id.toString() !in hidden }
             val recentLocations = repository.getRecentLocations()
+            val recentTitles = if (prefs.suggestEventTitles.first()) {
+                repository.getRecentTitles()
+            } else {
+                emptyList()
+            }
             val mapsEnabled = prefs.osmMapsEnabled.first()
             if (eventId > 0L) {
                 // For a recurring event, many instances share the same id; startArg carries the
@@ -201,8 +223,15 @@ class EventEditorViewModel @Inject constructor(
                 val attendees = repository.getAttendees(eventId)
                 if (event != null) {
                     val cal = event.calendarId
-                    val startZ = event.start.atZone(zone)
-                    val endZ = event.end.atZone(zone)
+                    // The event's own zone, so an invitation written in another one is edited in
+                    // the terms it was written in rather than silently translated into the
+                    // phone's. All-day events are UTC by contract and read by date instead.
+                    val eventZone = event.timezone
+                        ?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+                        ?.takeIf { !event.allDay }
+                        ?: zone
+                    val startZ = event.start.atZone(eventZone)
+                    val endZ = event.end.atZone(eventZone)
                     val spec = RecurrenceRules.parse(event.rrule)
                     _state.value = EditorUiState(
                         loading = false,
@@ -223,8 +252,10 @@ class EventEditorViewModel @Inject constructor(
                         startTime = if (event.allDay) LocalTime.MIDNIGHT else startZ.toLocalTime(),
                         endDate = if (event.allDay) event.lastLocalDate(zone) else endZ.toLocalDate(),
                         endTime = if (event.allDay) LocalTime.MIDNIGHT else endZ.toLocalTime(),
+                        timezone = eventZone,
                         location = event.location.orEmpty(),
                         recentLocations = recentLocations,
+                        recentTitles = recentTitles,
                         mapsEnabled = mapsEnabled,
                         description = event.description.orEmpty(),
                         frequency = spec.frequency,
@@ -275,6 +306,7 @@ class EventEditorViewModel @Inject constructor(
                         endTime = if (source.allDay) LocalTime.MIDNIGHT else endZ.toLocalTime(),
                         location = source.location.orEmpty(),
                         recentLocations = recentLocations,
+                        recentTitles = recentTitles,
                         mapsEnabled = mapsEnabled,
                         description = source.description.orEmpty(),
                         frequency = spec.frequency,
@@ -348,11 +380,34 @@ class EventEditorViewModel @Inject constructor(
     fun updateTitle(value: String) = mutate { it.copy(title = value) }
     fun updateLocation(value: String) = mutate { it.copy(location = value) }
     fun updateDescription(value: String) = mutate { it.copy(description = value) }
-    fun updateAllDay(value: Boolean) = mutate { it.copy(allDay = value) }
+    /**
+     * All-day and timed events answer "when should this warn me" differently, so switching between
+     * them re-applies the matching default — until the user has chosen a reminder themselves, at
+     * which point their choice outranks both. "15 minutes before" on an all-day event fires at
+     * 23:45 the night before, which is the bug this setting exists to fix.
+     */
+    fun updateAllDay(value: Boolean) = mutate { state ->
+        val next = state.copy(allDay = value)
+        if (state.remindersTouched || state.isEditing) {
+            next
+        } else {
+            val minutes = if (value) allDayReminderDefault else globalReminderDefault
+            next.copy(reminderMinutes = listOfNotNull(minutes))
+        }
+    }
     fun updateStartDate(date: LocalDate) = mutate { it.copy(startDate = date).dragEndToStart() }
     fun updateStartTime(time: LocalTime) = mutate { it.copy(startTime = time).dragEndToStart() }
     fun updateEndDate(date: LocalDate) = mutate { it.copy(endDate = date).dragStartToEnd() }
     fun updateEndTime(time: LocalTime) = mutate { it.copy(endTime = time).dragStartToEnd() }
+
+    /**
+     * Re-anchors the event to [zoneId], keeping the times on screen and moving the instant.
+     *
+     * The other reading — keep the instant and re-label the fields — is what the phone already
+     * does for you every time you travel, and it is never what someone opening this row wants:
+     * they are saying "the 09:00 I typed is 09:00 in New York".
+     */
+    fun updateTimezone(zoneId: ZoneId) = mutate { it.copy(timezone = zoneId) }
     fun updateFrequency(freq: Frequency) = mutate {
         it.copy(frequency = freq, recurrenceDirty = true)
     }
@@ -480,11 +535,13 @@ class EventEditorViewModel @Inject constructor(
         if (!current.canSave) return
         mutate { it.copy(saving = true) }
         viewModelScope.launch {
-            val startInstant = combineInstant(current.startDate, current.startTime, current.allDay)
+            val startInstant =
+                combineInstant(current.startDate, current.startTime, current.allDay, current.timezone)
             val endInstant = combineInstant(
                 if (current.allDay) current.endDate.plusDays(1) else current.endDate,
                 if (current.allDay) LocalTime.MIDNIGHT else current.endTime,
                 current.allDay,
+                current.timezone,
             )
             // Preserve the original rule verbatim unless the user actually edited recurrence,
             // so externally-synced CalDAV rules (BYMONTHDAY, BYSETPOS, …) survive unrelated edits.
@@ -512,13 +569,13 @@ class EventEditorViewModel @Inject constructor(
                 start = startInstant,
                 end = endInstant,
                 allDay = current.allDay,
-                // Keep the event anchored to the zone it was authored in. Rewriting it to the
-                // device zone preserves the instant the user picked but re-anchors future
-                // occurrences and shifts the event for every other client on the same CalDAV
-                // calendar. New events (and all-day events, which are UTC by contract) fall back.
+                // The zone the fields were filled in, which defaults to the one the event was
+                // authored in. Rewriting a travelling or CalDAV event to the device zone would
+                // preserve the instant the user picked but re-anchor future occurrences and shift
+                // it for every other client on the calendar; all-day events are UTC by contract.
                 timezone = when {
                     current.allDay -> ZoneOffset.UTC.id
-                    else -> resolveEventTimezone(current.originalTimezone, zone)
+                    else -> resolveEventTimezone(current.timezone.id, zone)
                 },
                 frequency = current.frequency,
                 rrule = rrule,
@@ -562,11 +619,16 @@ class EventEditorViewModel @Inject constructor(
         }
     }
 
-    private fun combineInstant(date: LocalDate, time: LocalTime, allDay: Boolean): Instant {
+    private fun combineInstant(
+        date: LocalDate,
+        time: LocalTime,
+        allDay: Boolean,
+        inZone: ZoneId,
+    ): Instant {
         return if (allDay) {
             date.atStartOfDay(ZoneOffset.UTC).toInstant()
         } else {
-            date.atTime(time).atZone(zone).toInstant()
+            date.atTime(time).atZone(inZone).toInstant()
         }
     }
 

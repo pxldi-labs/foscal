@@ -46,8 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.core.model.Event
-import app.foscal.core.ui.theme.BricolageFamily
-import app.foscal.core.ui.theme.amberTextColor
+import app.foscal.core.ui.theme.DisplayFamily
 import app.foscal.core.ui.theme.onTodayDiscColor
 import app.foscal.core.ui.theme.todayDiscColor
 import app.foscal.ui.util.Dates
@@ -245,7 +244,7 @@ private fun AgendaMonthHeader(
             Text(
                 text = yearMonth.atDay(1).format(rememberDateFormatter("LLLL yyyy")),
                 style = MaterialTheme.typography.titleMedium,
-                fontFamily = BricolageFamily,
+                fontFamily = DisplayFamily,
                 fontWeight = FontWeight.Bold,
                 color = if (isCurrentMonth) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurface,
@@ -313,7 +312,7 @@ private fun AgendaDateGutter(date: LocalDate, isToday: Boolean) {
             Text(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.titleLarge,
-                fontFamily = BricolageFamily,
+                fontFamily = DisplayFamily,
                 fontWeight = FontWeight.SemiBold,
                 color = if (isToday) onTodayDiscColor()
                 else MaterialTheme.colorScheme.onSurface,
@@ -323,8 +322,9 @@ private fun AgendaDateGutter(date: LocalDate, isToday: Boolean) {
             text = date.format(rememberDateFormatter("EEE")),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
-            // Amber as text, so the darkened form: the disc colour is 1.5:1 on this surface.
-            color = if (isToday) amberTextColor()
+            // The accent as text under the accent-filled disc, tying the two halves of the gutter
+            // together; the other days keep the muted neutral.
+            color = if (isToday) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

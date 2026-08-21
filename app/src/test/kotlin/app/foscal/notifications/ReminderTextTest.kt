@@ -20,10 +20,12 @@ class ReminderTextTest {
 
     private fun label(
         start: LocalDateTime,
+        end: LocalDateTime? = null,
         allDay: Boolean = false,
         use24Hour: Boolean = true,
     ): String? = reminderWhen(
         startMillis = millis(start),
+        endMillis = end?.let { millis(it) } ?: 0L,
         nowMillis = millis(now),
         allDay = allDay,
         use24Hour = use24Hour,
@@ -32,29 +34,54 @@ class ReminderTextTest {
     )
 
     @Test
-    fun `close to the event it says how long you have`() {
-        assertEquals("In 15 min", label(now.plusMinutes(15)))
-        assertEquals("In 59 min", label(now.plusMinutes(59)))
-        assertEquals("Now", label(now))
-        assertEquals("5 min ago", label(now.minusMinutes(5)))
+    fun `an event today is just its clock time`() {
+        assertEquals(
+            "21:30 – 22:00",
+            label(now.with(LocalTime.of(21, 30)), now.with(LocalTime.of(22, 0))),
+        )
     }
 
     @Test
-    fun `further out it says when the event is instead`() {
-        // An hour is where "how long you have" stops being the useful half.
-        assertEquals("Today at 14:00", label(now.with(LocalTime.of(14, 0))))
-        assertEquals("Tomorrow at 09:00", label(now.plusDays(1).with(LocalTime.of(9, 0))))
-        assertEquals("Friday at 09:00", label(now.plusDays(3).with(LocalTime.of(9, 0))))
+    fun `the time is the time however close the event is`() {
+        // The lead time used to take over within the hour, which meant the reminder that mattered
+        // most was the one that said "Now".
+        assertEquals("11:15 – 12:00", label(now, now.with(LocalTime.of(12, 0))))
+        assertEquals("11:30 – 12:00", label(now.plusMinutes(15), now.with(LocalTime.of(12, 0))))
+    }
+
+    @Test
+    fun `another day is named before its time`() {
+        assertEquals(
+            "Tomorrow, 09:00 – 10:00",
+            label(now.plusDays(1).with(LocalTime.of(9, 0)), now.plusDays(1).with(LocalTime.of(10, 0))),
+        )
+        assertEquals(
+            "Friday, 09:00 – 10:00",
+            label(now.plusDays(3).with(LocalTime.of(9, 0)), now.plusDays(3).with(LocalTime.of(10, 0))),
+        )
     }
 
     @Test
     fun `beyond a week the weekday alone no longer places it`() {
-        assertEquals("Tue, Sept 1 at 09:00", label(now.plusDays(14).with(LocalTime.of(9, 0))))
+        assertEquals(
+            "Tue, Sept 1, 09:00 – 10:00",
+            label(now.plusDays(14).with(LocalTime.of(9, 0)), now.plusDays(14).with(LocalTime.of(10, 0))),
+        )
     }
 
     @Test
-    fun `a late alarm admits it rather than repeating its offset`() {
-        assertEquals("Yesterday at 09:00", label(now.minusDays(1).with(LocalTime.of(9, 0))))
+    fun `a late alarm still says when the thing was`() {
+        assertEquals(
+            "Yesterday, 09:00 – 10:00",
+            label(now.minusDays(1).with(LocalTime.of(9, 0)), now.minusDays(1).with(LocalTime.of(10, 0))),
+        )
+    }
+
+    @Test
+    fun `an end the provider could not supply is left off`() {
+        assertEquals("14:00", label(now.with(LocalTime.of(14, 0))))
+        // An end at or before the start is no end at all.
+        assertEquals("14:00", label(now.with(LocalTime.of(14, 0)), now.with(LocalTime.of(14, 0))))
     }
 
     @Test
@@ -70,13 +97,17 @@ class ReminderTextTest {
     @Test
     fun `twelve-hour clocks get twelve-hour times`() {
         assertEquals(
-            "Tomorrow at 9:00 am",
-            label(now.plusDays(1).with(LocalTime.of(9, 0)), use24Hour = false),
+            "Tomorrow, 9:00 am – 10:00 am",
+            label(
+                now.plusDays(1).with(LocalTime.of(9, 0)),
+                now.plusDays(1).with(LocalTime.of(10, 0)),
+                use24Hour = false,
+            ),
         )
     }
 
     @Test
     fun `an event with no start has nothing to say`() {
-        assertNull(reminderWhen(0L, millis(now), false, true, zone, locale))
+        assertNull(reminderWhen(0L, 0L, millis(now), false, true, zone, locale))
     }
 }

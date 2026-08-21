@@ -50,6 +50,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,10 +62,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.foscal.core.model.Event
-import app.foscal.core.ui.theme.BricolageFamily
+import app.foscal.core.ui.theme.DisplayFamily
 import app.foscal.core.ui.theme.Motion
 import app.foscal.core.ui.theme.onTodayDiscColor
 import app.foscal.core.ui.theme.todayDiscColor
+import app.foscal.core.ui.theme.weekendLabelColor
 import app.foscal.ui.common.pageOnSwipe
 import app.foscal.ui.util.Dates
 import app.foscal.ui.util.LocalUse24HourClock
@@ -123,6 +126,7 @@ fun MonthRoute(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            val haptics = LocalHapticFeedback.current
             WeekHeader(firstDayOfWeek = state.firstDayOfWeek, showWeekNumbers = state.showWeekNumbers)
             androidx.compose.foundation.layout.BoxWithConstraints(
                 modifier = Modifier
@@ -175,7 +179,20 @@ fun MonthRoute(
                                 rowHeight = rowHeight,
                                 showWeekNumber = state.showWeekNumbers,
                                 onDayClick = { date ->
-                                    viewModel.selectDate(date)
+                                    // A greyed cell is a real day, and the only reason to reach
+                                    // for one is to go to it. Tapping it used to select a day the
+                                    // grid then kept showing as an outsider, which reads as the
+                                    // tap having half worked.
+                                    if (YearMonth.from(date) != visibleMonth) {
+                                        // The same tick a swipe between months gives, because it
+                                        // is the same event: the month under your finger changed.
+                                        haptics.performHapticFeedback(
+                                            HapticFeedbackType.GestureThresholdActivate,
+                                        )
+                                        viewModel.goToDate(date)
+                                    } else {
+                                        viewModel.selectDate(date)
+                                    }
                                 },
                             )
                         }
@@ -314,7 +331,7 @@ private fun MonthJumpDialog(
 private fun TitleText(text: String, color: Color, fontWeight: FontWeight) {
     Text(
         text,
-        fontFamily = BricolageFamily,
+        fontFamily = DisplayFamily,
         fontSize = 24.sp,
         lineHeight = 28.sp,
         fontWeight = fontWeight,
@@ -365,24 +382,20 @@ private fun DayPreviewPanel(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
                         )
-                        Text(
-                            text = if (events.isEmpty()) "No events" else {
-                                "${events.size} event${if (events.size == 1) "" else "s"}"
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
+                        // An empty day is already visibly empty; a count of nothing and a line
+                        // explaining the button next to it are two labels for a fact the reader
+                        // can see. The + is the only thing there is to say.
+                        if (events.isNotEmpty()) {
+                            Text(
+                                text = "${events.size} event${if (events.size == 1) "" else "s"}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
-                if (events.isEmpty()) {
-                    Text(
-                        "Tap + to add something to this day.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                } else {
+                if (events.isNotEmpty()) {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -462,7 +475,7 @@ private fun WeekHeader(firstDayOfWeek: DayOfWeek, showWeekNumbers: Boolean) {
         if (showWeekNumbers) Spacer(Modifier.width(WeekNumberGutter))
         val locale = currentLocale()
         val labels = remember(locale, firstDayOfWeek) {
-            Dates.weekStartLabels(locale, firstDayOfWeek)
+            Dates.weekStartLabels(locale, firstDayOfWeek, TextStyle.SHORT)
         }
         labels.forEachIndexed { index, label ->
             Text(
@@ -472,7 +485,7 @@ private fun WeekHeader(firstDayOfWeek: DayOfWeek, showWeekNumbers: Boolean) {
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = if (index >= 5) {
-                    app.foscal.core.ui.theme.weekendLabelColor()
+                    weekendLabelColor()
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
@@ -548,26 +561,27 @@ private fun DayCell(
     val shape = RoundedCornerShape(12.dp)
     val onSurface = MaterialTheme.colorScheme.onSurface
     val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val accent = MaterialTheme.colorScheme.primary
     // Both of these were animated, and neither could ever animate: AnimatedContent gives each month
     // its own subtree, so a cell's month membership and its today-ness are fixed for its whole
     // lifetime. The animations snapped to their targets on the first frame and charged 42 cells x 2
     // running animations per swipe for the privilege — spent during the exact frames the slide
-    // needs. Today reads as a filled amber disc; a tapped day gets a soft tonal one in the accent,
-    // so the two stop being the same blue and start meaning different things.
+    // needs. One colour, two marks: today is a filled accent disc, a tapped day tints its whole
+    // cell and sets the number in the accent. Both were discs before, which left the difference
+    // resting on two neighbouring tones of the same hue — and under a wallpaper-derived scheme
+    // that tonal disc could land on any washed-out colour the palette happened to hold.
     val dayNumberColor = if (isInFocusedMonth) onSurface else muted
-    val discColor = when {
-        isToday -> todayDiscColor()
-        isSelected -> MaterialTheme.colorScheme.primaryContainer
-        else -> Color.Transparent
-    }
+    val cellTint = if (isSelected) accent.copy(alpha = 0.12f) else Color.Transparent
+    val discColor = if (isToday) todayDiscColor() else Color.Transparent
     val numberColor = when {
         isToday -> onTodayDiscColor()
-        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+        isSelected -> accent
         else -> dayNumberColor
     }
     Box(
         modifier = modifier
             .clip(shape)
+            .background(cellTint)
             .clickable(onClick = onClick),
     ) {
         Column(
@@ -585,7 +599,7 @@ private fun DayCell(
             ) {
                 Text(
                     text = date.dayOfMonth.toString(),
-                    fontFamily = BricolageFamily,
+                    fontFamily = DisplayFamily,
                     fontSize = 15.5.sp,
                     fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
                     color = numberColor,

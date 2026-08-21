@@ -7,6 +7,7 @@ import app.foscal.core.data.Preferences
 import app.foscal.core.model.Event
 import app.foscal.ui.util.Dates
 import app.foscal.ui.util.visibleCalendarIds
+import app.foscal.ui.util.withoutDeclined
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.Instant
 import java.time.LocalDate
@@ -137,9 +139,12 @@ class AgendaViewModel @Inject constructor(
         AgendaBounds(currentDate, range, from, to)
     }
 
-    private val events = combine(calendarIds, bounds) { ids, b -> ids to b }
-        .flatMapLatest { (ids, b) ->
+    private val events =
+        combine(calendarIds, bounds, prefs.showDeclinedEvents) { ids, b, showDeclined ->
+            Triple(ids, b, showDeclined)
+        }.flatMapLatest { (ids, b, showDeclined) ->
             repository.observeEvents(ids, b.from, b.to)
+                .map { it.withoutDeclined(showDeclined) }
         }
 
     val state: StateFlow<AgendaUiState> = combine(calendarIds, events, window, today) { ids, evts, range, currentDate ->

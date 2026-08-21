@@ -2,6 +2,7 @@ package app.foscal.ui.util
 
 import app.foscal.core.data.CalendarRepository
 import app.foscal.core.data.Preferences
+import app.foscal.core.model.Event
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -41,3 +42,14 @@ fun monthCalendarIds(
 ) { visible, hiddenInMonth ->
     visible - hiddenInMonth.mapNotNull(String::toLongOrNull).toSet()
 }
+
+/**
+ * [events] as the grid should show them: without the ones the user has declined, unless they have
+ * asked to see those.
+ *
+ * A filter rather than a query condition because `Instances` has no index worth the selection and
+ * the list is already in memory; and because the same list is used for the reminder count on a day
+ * cell, where a declined meeting should not be counted either.
+ */
+fun List<Event>.withoutDeclined(showDeclined: Boolean): List<Event> =
+    if (showDeclined) this else filter { !it.declined }

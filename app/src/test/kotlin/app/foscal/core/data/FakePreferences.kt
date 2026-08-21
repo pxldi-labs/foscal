@@ -1,9 +1,9 @@
 package app.foscal.core.data
 
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
+import app.foscal.core.model.UiColor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.DayOfWeek
@@ -16,7 +16,6 @@ class FakePreferences(
     monthMinimum: Int = 0,
     private val defaultReminder: Int? = 15,
     calendarReminders: Map<Long, Int?> = emptyMap(),
-    accent: AccentColor = AccentColor.COBALT,
     theme: ThemeMode = ThemeMode.SYSTEM,
     use24Hour: Boolean = true,
     osmMaps: Boolean = false,
@@ -31,10 +30,9 @@ class FakePreferences(
     override val defaultReminderMinutes: Flow<Int?> = MutableStateFlow(defaultReminder)
     override val calendarReminderDefaults: MutableStateFlow<Map<Long, Int?>> =
         MutableStateFlow(calendarReminders)
-    override val accentColor: MutableStateFlow<AccentColor> = MutableStateFlow(accent)
-    override val accentCustomColor: MutableStateFlow<Int> =
-        MutableStateFlow(AccentColor.DEFAULT_CUSTOM_COLOR)
-    override val dynamicColor: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    override val uiColor: MutableStateFlow<UiColor> = MutableStateFlow(UiColor.Default)
+    override val uiCustomColor: MutableStateFlow<Int> =
+        MutableStateFlow(UiColor.DEFAULT_CUSTOM_COLOR)
     override val themeMode: MutableStateFlow<ThemeMode> = MutableStateFlow(theme)
     override val use24HourClock: MutableStateFlow<Boolean> = MutableStateFlow(use24Hour)
     override val osmMapsEnabled: MutableStateFlow<Boolean> = MutableStateFlow(osmMaps)
@@ -43,6 +41,13 @@ class FakePreferences(
     override val firstDayOfWeek: MutableStateFlow<DayOfWeek> = MutableStateFlow(firstDay)
     override val defaultEventMinutes: MutableStateFlow<Int> = MutableStateFlow(eventMinutes)
     override val showWeekNumbers: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    override val allDayReminderMinutes: MutableStateFlow<Int?> =
+        MutableStateFlow(Preferences.DEFAULT_ALL_DAY_REMINDER_MINUTES)
+    override val showDeclinedEvents: MutableStateFlow<Boolean> = MutableStateFlow(true)
+    override val widgetEventLimit: MutableStateFlow<Int> =
+        MutableStateFlow(Preferences.DEFAULT_WIDGET_EVENT_LIMIT)
+    override val widgetDetailedRows: MutableStateFlow<Boolean> = MutableStateFlow(true)
+    override val suggestEventTitles: MutableStateFlow<Boolean> = MutableStateFlow(true)
     override val dayTapAction: MutableStateFlow<DayTapAction> =
         MutableStateFlow(DayTapAction.Default)
 
@@ -61,6 +66,11 @@ class FakePreferences(
     override suspend fun setFirstDayOfWeek(day: DayOfWeek) { firstDayOfWeek.value = day }
     override suspend fun setDefaultEventMinutes(minutes: Int) { defaultEventMinutes.value = minutes }
     override suspend fun setShowWeekNumbers(enabled: Boolean) { showWeekNumbers.value = enabled }
+    override suspend fun setAllDayReminder(minutes: Int?) { allDayReminderMinutes.value = minutes }
+    override suspend fun setShowDeclinedEvents(enabled: Boolean) { showDeclinedEvents.value = enabled }
+    override suspend fun setWidgetEventLimit(limit: Int) { widgetEventLimit.value = limit }
+    override suspend fun setWidgetDetailedRows(enabled: Boolean) { widgetDetailedRows.value = enabled }
+    override suspend fun setSuggestEventTitles(enabled: Boolean) { suggestEventTitles.value = enabled }
     override suspend fun setDayTapAction(action: DayTapAction) { dayTapAction.value = action }
 
     override suspend fun setEventColorStrength(strength: EventColorStrength) {
@@ -87,17 +97,8 @@ class FakePreferences(
         calendarReminderDefaults.value -= calendarId
     }
 
-    override suspend fun setAccentColor(accent: AccentColor) {
-        accentColor.value = accent
-    }
-
-    override suspend fun setAccentCustomColor(color: Int) {
-        accentCustomColor.value = color
-    }
-
-    override suspend fun setDynamicColor(enabled: Boolean) {
-        dynamicColor.value = enabled
-    }
+    override suspend fun setUiColor(color: UiColor) { uiColor.value = color }
+    override suspend fun setUiCustomColor(color: Int) { uiCustomColor.value = color }
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         themeMode.value = mode

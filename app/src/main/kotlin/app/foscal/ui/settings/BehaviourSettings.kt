@@ -124,8 +124,60 @@ fun CalendarViewSettings(
             onToggle = onUse24HourClock,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
         )
+        ToggleRow(
+            title = "Declined events",
+            // A meeting you said no to is one you are not going to, and leaving it on the grid
+            // makes a free afternoon look busy. Hidden, not deleted: search still finds it.
+            subtitle = if (state.showDeclinedEvents) {
+                "Shown on the grid"
+            } else {
+                "Hidden once you decline"
+            },
+            checked = state.showDeclinedEvents,
+            onToggle = viewModel::setShowDeclinedEvents,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        )
     }
 }
+
+/** How much the home-screen widget says, and how much of the week it gets through. */
+@Composable
+fun WidgetSettings(state: BehaviourState, viewModel: BehaviourViewModel) {
+    var picking by remember { mutableStateOf(false) }
+    if (picking) {
+        ChoiceDialog(
+            title = "Events per day",
+            options = WidgetLimitOptions.map { it.toString() to widgetLimitLabel(it) },
+            selected = state.widgetEventLimit.toString(),
+            onSelect = { viewModel.setWidgetEventLimit(it.toInt()); picking = false },
+            onDismiss = { picking = false },
+        )
+    }
+    Column {
+        ValueRow(
+            title = "Events per day",
+            value = widgetLimitLabel(state.widgetEventLimit),
+            onClick = { picking = true },
+        )
+        ToggleRow(
+            title = "Detailed rows",
+            subtitle = if (state.widgetDetailedRows) {
+                "End time and location too"
+            } else {
+                "Start time only"
+            },
+            checked = state.widgetDetailedRows,
+            onToggle = viewModel::setWidgetDetailedRows,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        )
+    }
+}
+
+/** How many of one day's events the widget lists. Zero, the default, is all of them. */
+private val WidgetLimitOptions = listOf(0, 3, 5, 8, 12, 20)
+
+private fun widgetLimitLabel(limit: Int): String =
+    if (limit <= 0) "All of them" else "$limit per day"
 
 /** What a new event starts out as, before you have typed anything into it. */
 @Composable
@@ -183,6 +235,18 @@ fun NewEventSettings(
             onToggle = onMapsEnabled,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
         )
+        ToggleRow(
+            title = "Suggest titles",
+            // Their own past events, read off this phone. Same lookup as the location field.
+            subtitle = if (state.suggestEventTitles) {
+                "From events you have written before"
+            } else {
+                "Off"
+            },
+            checked = state.suggestEventTitles,
+            onToggle = viewModel::setSuggestEventTitles,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        )
     }
 }
 
@@ -211,7 +275,7 @@ private fun startViewOptions(): List<Pair<String, String>> =
     listOf("" to "Last used") + CalendarView.entries.map { it.name to it.label }
 
 @Composable
-private fun ValueRow(title: String, value: String, onClick: () -> Unit) {
+internal fun ValueRow(title: String, value: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -228,7 +292,7 @@ private fun ValueRow(title: String, value: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ChoiceDialog(
+internal fun ChoiceDialog(
     title: String,
     options: List<Pair<String, String>>,
     selected: String,

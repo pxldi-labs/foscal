@@ -13,7 +13,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
-import app.foscal.core.model.AccentColor
+import app.foscal.core.model.UiColor
 
 private fun lightColorsFor(accent: AccentTokens) = lightColorScheme(
     primary = accent.primaryLight,
@@ -74,19 +74,17 @@ val LocalIsDarkTheme = staticCompositionLocalOf { false }
 @Composable
 fun FoscalTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
-    accent: AccentColor = AccentColor.Default,
-    customSeed: Color? = null,
+    uiColor: UiColor = UiColor.Default,
+    customSeed: Color = Color(UiColor.DEFAULT_CUSTOM_COLOR),
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val tokens = if (accent == AccentColor.CUSTOM && customSeed != null) {
-        customAccentTokens(customSeed)
-    } else {
-        accent.tokens()
-    }
+    // Three answers rather than a palette: the wallpaper's, Foscal's own, or one the user picked.
+    // Whatever the choice, `CobaltAccent` is the floor — a stored SYSTEM on a phone below Android
+    // 12 has no dynamic scheme to read, and falling back is better than refusing to draw.
+    val tokens = if (uiColor == UiColor.CUSTOM) customAccentTokens(customSeed) else CobaltAccent
     val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+        uiColor == UiColor.SYSTEM && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         darkTheme -> darkColorsFor(tokens)
         else -> lightColorsFor(tokens)
@@ -100,19 +98,11 @@ fun FoscalTheme(
     }
 }
 
-/** Maps a persisted [AccentColor] preset to its light/dark color tokens. */
-fun AccentColor.tokens(): AccentTokens = when (this) {
-    AccentColor.COBALT -> CobaltAccent
-    AccentColor.VIOLET -> VioletAccent
-    AccentColor.FOREST -> ForestAccent
-    // CUSTOM has no fixed tokens; callers pass the seed to customAccentTokens. Fall back to the
-    // default preset if a seed isn't supplied.
-    AccentColor.CUSTOM -> CobaltAccent
-}
+
 
 /**
- * Derives a full accent from a single [seed] color by blending it toward white/black, so any
- * user-picked color yields a coherent light/dark palette without hand-tuning each token.
+ * Derives a full accent from a single [seed] colour by blending it toward white and black, so any
+ * colour the user picks yields a coherent light/dark palette without hand-tuning each token.
  */
 fun customAccentTokens(seed: Color): AccentTokens = AccentTokens(
     primaryLight = seed,
@@ -122,9 +112,9 @@ fun customAccentTokens(seed: Color): AccentTokens = AccentTokens(
     onPrimaryDark = lerp(seed, Color.Black, 0.82f),
     primaryContainerDark = lerp(seed, Color.Black, 0.58f),
     onPrimaryContainerDark = lerp(seed, Color.White, 0.80f),
-    // A step off the seed rather than a second hue: the presets pair their primary with a chosen
-    // companion, and there is no way to choose one on the user's behalf from a single colour that
-    // would not be a guess. Lighter and quieter is the safe reading of "secondary".
+    // A step off the seed rather than a second hue: there is no way to choose a companion colour
+    // on the user's behalf from a single one that would not be a guess. Lighter and quieter is the
+    // safe reading of "secondary".
     secondaryLight = lerp(seed, Color.Black, 0.24f),
     secondaryContainerLight = lerp(seed, Color.White, 0.80f),
     onSecondaryContainerLight = lerp(seed, Color.Black, 0.70f),
@@ -133,29 +123,20 @@ fun customAccentTokens(seed: Color): AccentTokens = AccentTokens(
     onSecondaryContainerDark = lerp(seed, Color.White, 0.72f),
 )
 
-/**
- * Amber where it is drawn as text rather than as a fill — weekend labels, today's weekday.
- *
- * The light form is the brand amber darkened until it clears 4.5:1 on white. The gold this
- * replaced sat at 2.5:1, which was both off-palette and not actually readable.
- */
+/** Weekend day-of-week label colour: the accent, against the neutral of the other five. */
 @Composable
-fun amberTextColor(darkTheme: Boolean = LocalIsDarkTheme.current): Color =
-    if (darkTheme) AmberTextDark else AmberTextLight
-
-/** Weekend day-of-week label colour. */
-@Composable
-fun weekendLabelColor(darkTheme: Boolean = LocalIsDarkTheme.current): Color =
-    amberTextColor(darkTheme)
+fun weekendLabelColor(): Color = MaterialTheme.colorScheme.primary
 
 /**
  * The filled disc marking today, and the ink on it.
  *
- * Amber rather than the accent, so the icon on the home screen is a literal preview of the app —
- * and so that today stops looking like a selected day, which was the other blue disc.
+ * Whichever accent is in force. This was the brand amber, on the reasoning that it made the
+ * launcher icon a preview of the app; that reasoning does not survive the user choosing a colour,
+ * because the one day always on screen was then the one thing their choice did not reach. Today
+ * and a tapped day are told apart by shape now, not hue: a filled disc against a tinted cell.
  */
 @Composable
-fun todayDiscColor(): Color = FoscalAmber
+fun todayDiscColor(): Color = MaterialTheme.colorScheme.primary
 
 @Composable
-fun onTodayDiscColor(): Color = AmberInk
+fun onTodayDiscColor(): Color = MaterialTheme.colorScheme.onPrimary

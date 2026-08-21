@@ -14,7 +14,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,12 +34,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
@@ -58,6 +70,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -73,6 +87,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -85,6 +100,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -100,9 +116,11 @@ import app.foscal.ui.util.LocalUse24HourClock
 import app.foscal.ui.util.currentLocale
 import app.foscal.ui.util.rememberDateFormatter
 import app.foscal.ui.util.rememberTimeFormatter
+import app.foscal.ui.util.timeFormatter
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.TextStyle
 
 private val rowPadding = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
@@ -218,112 +236,133 @@ private fun EditorForm(
                     keyboard?.show()
                 }
             }
-            OutlinedTextField(
-                value = titleField,
-                onValueChange = {
-                    titleField = it
-                    viewModel.updateTitle(it.text)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .focusRequester(titleFocus),
-                placeholder = { Text("Add title") },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.titleLarge,
-            )
-        }
-
-        // Calendar picker
-        if (state.availableCalendars.isNotEmpty()) {
-            Section {
-                var expanded by remember { mutableStateOf(false) }
-                val selected = state.availableCalendars.firstOrNull { it.id == state.selectedCalendarId }
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it },
+            // Suggested from the user's own past titles, the way the location field is: most of
+            // a calendar is repetition, and "Zahnarzt" has almost certainly been typed before.
+            val titleSuggestions = remember(state.title, state.recentTitles) {
+                val query = state.title.trim()
+                if (query.isEmpty()) {
+                    emptyList()
+                } else {
+                    state.recentTitles
+                        .filter { it != state.title && it.contains(query, ignoreCase = true) }
+                        .take(5)
+                }
+            }
+            var titleMenu by remember { mutableStateOf(false) }
+            val titleMenuOpen = titleMenu && titleSuggestions.isNotEmpty()
+            ExposedDropdownMenuBox(
+                expanded = titleMenuOpen,
+                onExpandedChange = { titleMenu = it },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                TextField(
+                    value = titleField,
+                    onValueChange = {
+                        titleField = it
+                        titleMenu = true
+                        viewModel.updateTitle(it.text)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+                        .focusRequester(titleFocus),
+                    placeholder = { Text("Add title", style = MaterialTheme.typography.titleLarge) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.titleLarge,
+                    colors = plainFieldColors(),
+                )
+                ExposedDropdownMenu(
+                    expanded = titleMenuOpen,
+                    onDismissRequest = { titleMenu = false },
                 ) {
-                    OutlinedTextField(
-                        value = selected?.displayName ?: "Select calendar",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Calendar") },
-                        leadingIcon = {
-                            ColorDot(Modifier.size(14.dp), color = selected?.color ?: 0xFF1976D2.toInt())
-                        },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        state.availableCalendars.forEach { cal ->
-                            DropdownMenuItem(
-                                text = { Text(cal.displayName) },
-                                leadingIcon = { ColorDot(Modifier.size(14.dp), color = cal.color) },
-                                onClick = {
-                                    viewModel.selectCalendar(cal.id)
-                                    expanded = false
-                                },
-                            )
-                        }
+                    titleSuggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = { Text(suggestion) },
+                            onClick = {
+                                titleField = TextFieldValue(suggestion, TextRange(suggestion.length))
+                                viewModel.updateTitle(suggestion)
+                                titleMenu = false
+                            },
+                        )
                     }
                 }
             }
         }
 
-        // All-day toggle
-        Section {
-            ToggleRow(
-                label = "All day",
-                checked = state.allDay,
-                onCheckedChange = viewModel::updateAllDay,
-                modifier = rowPadding.fillMaxWidth(),
-            )
-        }
+        // Everything below reads as one fact per row, down a rail of icons: what the row is on
+        // the left, what it says on the right. The rail is what makes a form of fifteen fields
+        // scannable — you find the bell rather than reading four labels on the way to it. Repeat
+        // and reminders keep their chips inline rather than folding behind a sheet, because they
+        // are the two things touched on almost every event and a sheet turns one tap into three.
 
-        // Start / End
+        // When it is
         Section {
-            DateTimeRow(
-                label = "Starts",
-                date = state.startDate,
-                time = state.startTime,
-                showTime = !state.allDay,
-                onPickDate = viewModel::updateStartDate,
-                onPickTime = viewModel::updateStartTime,
-                modifier = rowPadding.fillMaxWidth(),
-            )
-            DateTimeRow(
-                label = "Ends",
-                date = state.endDate,
-                time = state.endTime,
-                showTime = !state.allDay,
-                onPickDate = viewModel::updateEndDate,
-                onPickTime = viewModel::updateEndTime,
-                modifier = rowPadding.fillMaxWidth(),
-            )
-        }
-
-        // Recurrence
-        Section {
-            Column(
-                modifier = rowPadding.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Rail(Icons.Outlined.Schedule) {
+                ToggleRow(
+                    label = "All day",
+                    checked = state.allDay,
+                    onCheckedChange = viewModel::updateAllDay,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Rail(null) {
+                DateTimeRow(
+                    label = "Starts",
+                    date = state.startDate,
+                    time = state.startTime,
+                    showTime = !state.allDay,
+                    onPickDate = viewModel::updateStartDate,
+                    onPickTime = viewModel::updateStartTime,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Rail(null) {
+                DateTimeRow(
+                    label = "Ends",
+                    date = state.endDate,
+                    time = state.endTime,
+                    showTime = !state.allDay,
+                    onPickDate = viewModel::updateEndDate,
+                    onPickTime = viewModel::updateEndTime,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            // All-day events are UTC by contract and have no clock time to anchor, so the row
+            // would be offering a choice that does nothing.
+            AnimatedVisibility(
+                visible = !state.allDay,
+                enter = expandVertically(tween(Motion.DurationMedium)) +
+                    fadeIn(tween(Motion.DurationMedium)),
+                exit = shrinkVertically(tween(Motion.DurationShort)) +
+                    fadeOut(tween(Motion.DurationShort)),
             ) {
+                Rail(Icons.Outlined.Public) {
+                    TimezoneRow(
+                        zone = state.timezone,
+                        startDate = state.startDate,
+                        startTime = state.startTime,
+                        endDate = state.endDate,
+                        endTime = state.endTime,
+                        differs = state.timezoneDiffers,
+                        is24Hour = LocalUse24HourClock.current,
+                        onSelect = viewModel::updateTimezone,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+
+        // How often
+        Section {
+            Rail(Icons.Outlined.Repeat) {
                 ChipRow(
                     title = "Repeats",
                     selected = state.frequency,
                 ) { freq -> viewModel.updateFrequency(freq) }
                 // Grown into rather than popped in. Choosing "Weekly" adds a button and, behind
                 // it, a whole panel of controls; appearing instantly made the rest of the form
-                // jump down the screen with nothing to say it had. The all-day row next to it
+                // jump down the screen with nothing to say it had. The all-day row above it
                 // already opens its time fields this way.
                 AnimatedVisibility(
                     visible = state.frequency != Frequency.NONE,
@@ -354,92 +393,37 @@ private fun EditorForm(
             }
         }
 
-        // Colour — its own, or the calendar's.
+        // What it says beforehand
         Section {
-            ColorRow(
-                selected = state.color,
-                calendarColor = state.availableCalendars
-                    .firstOrNull { it.id == state.selectedCalendarId }
-                    ?.color,
-                onSelect = viewModel::updateColor,
-                modifier = rowPadding.fillMaxWidth(),
-            )
-        }
-
-        // Reminder
-        Section {
-            ReminderRow(
-                selected = state.reminderMinutes,
-                onToggle = viewModel::toggleReminder,
-                modifier = rowPadding.fillMaxWidth(),
-            )
-        }
-
-        // Location — free text with offline autocomplete over the user's own past locations.
-        Section {
-            val suggestions = remember(state.location, state.recentLocations) {
-                val query = state.location.trim()
-                state.recentLocations
-                    .filter { it != state.location && (query.isEmpty() || it.contains(query, ignoreCase = true)) }
-                    .take(6)
-            }
-            var expanded by remember { mutableStateOf(false) }
-            val menuOpen = expanded && suggestions.isNotEmpty()
-            ExposedDropdownMenuBox(
-                expanded = menuOpen,
-                onExpandedChange = { expanded = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            ) {
-                OutlinedTextField(
-                    value = state.location,
-                    onValueChange = {
-                        viewModel.updateLocation(it)
-                        expanded = true
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                    label = { Text("Location") },
-                    singleLine = true,
-                    trailingIcon = if (suggestions.isNotEmpty()) {
-                        { ExposedDropdownMenuDefaults.TrailingIcon(menuOpen) }
-                    } else {
-                        null
-                    },
+            Rail(Icons.Outlined.Notifications) {
+                ReminderRow(
+                    selected = state.reminderMinutes,
+                    onToggle = viewModel::toggleReminder,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                ExposedDropdownMenu(
-                    expanded = menuOpen,
-                    onDismissRequest = { expanded = false },
-                ) {
-                    suggestions.forEach { suggestion ->
-                        DropdownMenuItem(
-                            text = { Text(suggestion) },
-                            leadingIcon = {
-                                Icon(Icons.Outlined.LocationOn, contentDescription = null)
-                            },
-                            onClick = {
-                                viewModel.updateLocation(suggestion)
-                                expanded = false
-                            },
-                        )
-                    }
+            }
+        }
+
+        // Where it lives, and what colour it is there
+        Section {
+            if (state.availableCalendars.isNotEmpty()) {
+                Rail(Icons.Outlined.CalendarMonth) {
+                    CalendarPickerRow(
+                        calendars = state.availableCalendars,
+                        selectedId = state.selectedCalendarId,
+                        onSelect = viewModel::selectCalendar,
+                    )
                 }
             }
-            if (state.mapsEnabled) {
-                TextButton(
-                    onClick = { onPickLocation(state.location) },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                ) {
-                    Icon(
-                        Icons.Outlined.Map,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    Text("Pick on map")
-                }
+            Rail(Icons.Outlined.Palette) {
+                ColorRow(
+                    selected = state.color,
+                    calendarColor = state.availableCalendars
+                        .firstOrNull { it.id == state.selectedCalendarId }
+                        ?.color,
+                    onSelect = viewModel::updateColor,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
 
@@ -447,33 +431,42 @@ private fun EditorForm(
         // on it, since there would be nothing to show and nothing to do.
         if (state.canEditGuests || state.attendees.isNotEmpty()) {
             Section {
-                GuestsField(
-                    attendees = state.attendees,
-                    draft = state.guestDraft,
-                    editable = state.canEditGuests,
-                    canAdd = state.canAddGuest,
-                    onDraftChange = viewModel::updateGuestDraft,
-                    onAdd = viewModel::addGuest,
-                    onRemove = viewModel::removeGuest,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                )
+                Rail(Icons.Outlined.People) {
+                    GuestsField(
+                        attendees = state.attendees,
+                        draft = state.guestDraft,
+                        editable = state.canEditGuests,
+                        canAdd = state.canAddGuest,
+                        onDraftChange = viewModel::updateGuestDraft,
+                        onAdd = viewModel::addGuest,
+                        onRemove = viewModel::removeGuest,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
 
-        // Notes
+        // Where, and anything else
         Section {
-            OutlinedTextField(
-                value = state.description,
-                onValueChange = viewModel::updateDescription,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                label = { Text("Notes") },
-                minLines = 3,
-                maxLines = 6,
-            )
+            Rail(Icons.Outlined.LocationOn) {
+                LocationField(
+                    location = state.location,
+                    recentLocations = state.recentLocations,
+                    mapsEnabled = state.mapsEnabled,
+                    onChange = viewModel::updateLocation,
+                    onPickOnMap = { onPickLocation(state.location) },
+                )
+            }
+            Rail(Icons.Outlined.Notes) {
+                PlainField(
+                    value = state.description,
+                    onValueChange = viewModel::updateDescription,
+                    placeholder = "Add notes",
+                    singleLine = false,
+                    maxLines = 6,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -501,6 +494,206 @@ private fun EditorForm(
             }
         }
         Spacer(Modifier.height(48.dp))
+    }
+}
+
+/**
+ * One row of the form: an icon on the left, the field on the right.
+ *
+ * The icon column is a fixed width whether or not there is an icon in it, so a row that continues
+ * the one above (the second date, say) lines its content up rather than sliding left. That column
+ * is the whole point — a form of fifteen fields is scanned by shape long before it is read, and an
+ * icon is a shape a label never is.
+ */
+@Composable
+private fun Rail(
+    icon: ImageVector?,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .padding(top = 2.dp),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            icon?.let {
+                Icon(
+                    it,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            content = content,
+        )
+    }
+}
+
+/**
+ * A text field with its box taken away.
+ *
+ * The rail and the dividers already say where one field ends and the next begins, so an outline
+ * around each one is a second, louder answer to a question nobody asked twice. What is left is the
+ * text and, when there is none, an invitation to write some.
+ */
+@Composable
+private fun plainFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent,
+    disabledContainerColor = Color.Transparent,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    disabledIndicatorColor = Color.Transparent,
+)
+
+@Composable
+private fun PlainField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    maxLines: Int = 1,
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        placeholder = { Text(placeholder) },
+        singleLine = singleLine,
+        maxLines = maxLines,
+        colors = plainFieldColors(),
+        textStyle = MaterialTheme.typography.bodyLarge,
+    )
+}
+
+/**
+ * Which calendar the event goes on: a row that says the answer, not a box that asks the question.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CalendarPickerRow(
+    calendars: List<app.foscal.core.model.Calendar>,
+    selectedId: Long?,
+    onSelect: (Long) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = calendars.firstOrNull { it.id == selectedId }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ColorDot(Modifier.size(12.dp), color = selected?.color ?: 0xFF1976D2.toInt())
+            Text(
+                selected?.displayName ?: "Select calendar",
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            calendars.forEach { cal ->
+                DropdownMenuItem(
+                    text = { Text(cal.displayName) },
+                    leadingIcon = { ColorDot(Modifier.size(14.dp), color = cal.color) },
+                    onClick = {
+                        onSelect(cal.id)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** Free text with offline autocomplete over the user's own past locations. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocationField(
+    location: String,
+    recentLocations: List<String>,
+    mapsEnabled: Boolean,
+    onChange: (String) -> Unit,
+    onPickOnMap: () -> Unit,
+) {
+    val suggestions = remember(location, recentLocations) {
+        val query = location.trim()
+        recentLocations
+            .filter { it != location && (query.isEmpty() || it.contains(query, ignoreCase = true)) }
+            .take(6)
+    }
+    var expanded by remember { mutableStateOf(false) }
+    val menuOpen = expanded && suggestions.isNotEmpty()
+    ExposedDropdownMenuBox(
+        expanded = menuOpen,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        TextField(
+            value = location,
+            onValueChange = {
+                onChange(it)
+                expanded = true
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            placeholder = { Text("Add location") },
+            singleLine = true,
+            colors = plainFieldColors(),
+            textStyle = MaterialTheme.typography.bodyLarge,
+            trailingIcon = if (suggestions.isNotEmpty()) {
+                { ExposedDropdownMenuDefaults.TrailingIcon(menuOpen) }
+            } else {
+                null
+            },
+        )
+        ExposedDropdownMenu(expanded = menuOpen, onDismissRequest = { expanded = false }) {
+            suggestions.forEach { suggestion ->
+                DropdownMenuItem(
+                    text = { Text(suggestion) },
+                    leadingIcon = { Icon(Icons.Outlined.LocationOn, contentDescription = null) },
+                    onClick = {
+                        onChange(suggestion)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+    if (mapsEnabled) {
+        TextButton(onClick = onPickOnMap, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Icon(Icons.Outlined.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.size(8.dp))
+            Text("Pick on map")
+        }
     }
 }
 
@@ -666,7 +859,19 @@ private fun ColorRow(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Colour", style = MaterialTheme.typography.bodyLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Colour", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                // Named, so the choice can be read rather than only compared. An unnamed colour is
+                // one a sync adapter chose, and "Custom" is the honest thing to call it.
+                when {
+                    selected == null -> "The calendar's"
+                    else -> CalendarColors.nameOf(selected) ?: "Custom"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -688,6 +893,66 @@ private fun ColorRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * The zone the times above are written in.
+ *
+ * Shown for every timed event rather than only the travelling ones: a row that appears when an
+ * event happens to be anchored elsewhere is a row nobody knows exists until it surprises them, and
+ * the whole point is to be able to say "09:00 in New York" *before* the event is wrong.
+ */
+@Composable
+private fun TimezoneRow(
+    zone: ZoneId,
+    startDate: LocalDate,
+    startTime: LocalTime,
+    endDate: LocalDate,
+    endTime: LocalTime,
+    differs: Boolean,
+    is24Hour: Boolean,
+    onSelect: (ZoneId) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var picking by remember { mutableStateOf(false) }
+    val locale = currentLocale()
+    val formatter = remember(is24Hour, locale) { timeFormatter(is24Hour, locale) }
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable { picking = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(zoneLabel(zone), style = MaterialTheme.typography.bodyLarge)
+            if (differs) {
+                // What the phone will show once this is saved. The times above are in the event's
+                // zone, which is right for editing and useless for answering "so when do I leave?".
+                val here = ZoneId.systemDefault()
+                val from = startDate.atTime(startTime).atZone(zone).withZoneSameInstant(here)
+                val to = endDate.atTime(endTime).atZone(zone).withZoneSameInstant(here)
+                Text(
+                    "${from.format(formatter)} – ${to.format(formatter)} where you are",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+
+    if (picking) {
+        TimezonePickerDialog(
+            selected = zone,
+            onSelect = {
+                onSelect(it)
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
     }
 }
 

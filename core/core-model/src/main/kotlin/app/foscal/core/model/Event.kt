@@ -20,6 +20,14 @@ data class Event(
     val color: Int,
     /** Non-null when this event is part of a recurring series (its RRULE string). */
     val rrule: String? = null,
+    /**
+     * Whether the user has answered "no" to this event.
+     *
+     * Read from `Instances.SELF_ATTENDEE_STATUS`, which the provider maintains from the attendee
+     * row matching the calendar's owner. False for anything with no invitation attached, which is
+     * most events: an event you created is one you are going to.
+     */
+    val declined: Boolean = false,
 ) {
     val durationMillis: Long
         get() = end.toEpochMilli() - start.toEpochMilli()
