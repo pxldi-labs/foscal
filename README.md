@@ -44,9 +44,10 @@ CalDAV-compatible server (Nextcloud, ownCloud, Radicale, Baïkal, …) via
   by default. Full light & dark support.
 - **Settings** is a fourth bottom-nav tab (it slides in alongside Month / Week /
   Agenda) with appearance, date & time, calendar visibility, and reminder options.
-- **System colours by default** — on Android 12+ the app's chrome is drawn from
-  your wallpaper (Material You). Turn it off in Settings for Foscal's own cobalt,
-  which is also what older releases get, since they have no dynamic palette to read.
+- **One colour for the app, three ways to set it** — the chrome is drawn from your
+  wallpaper (Material You) by default on Android 12+; Settings offers Foscal's own
+  cobalt or any colour you pick instead. Older releases have no dynamic palette to
+  read, so they start on cobalt.
 - **Theme & clock** — force **System / Light / Dark** and toggle **12- / 24-hour
   time**; both apply live across every screen and persist.
 - **Event editor** — create, edit, and delete events with title, calendar,
@@ -101,8 +102,8 @@ CalDAV-compatible server (Nextcloud, ownCloud, Radicale, Baïkal, …) via
   The final step lets users choose theme, reminders, and opt-in map picking
   before entering the main calendar.
 - Material 3, edge-to-edge, light & dark themes. The color scheme is wallpaper-derived
-  (Material You) by default on Android 12+, and falls back to Foscal's own cobalt when
-  that is switched off or unavailable.
+  (Material You) by default on Android 12+; `UiColor` also offers Foscal's own cobalt and
+  a user-picked seed, and cobalt is the fallback wherever dynamic color is unavailable.
 
 ## Roadmap
 

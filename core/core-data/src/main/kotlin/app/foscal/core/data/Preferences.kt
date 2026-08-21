@@ -3,6 +3,7 @@ package app.foscal.core.data
 import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
+import app.foscal.core.model.UiColor
 import kotlinx.coroutines.flow.Flow
 import java.time.DayOfWeek
 
@@ -51,14 +52,17 @@ interface Preferences {
      */
     val calendarReminderDefaults: Flow<Map<Long, Int?>>
     /**
-     * Whether the app's own chrome takes its colours from the system wallpaper (Material You).
+     * Where the app's own chrome takes its colour from.
      *
-     * On by default. A calendar's colours belong to its calendars and its events; a UI that also
-     * insists on a hue of its own is competing with the thing it exists to show. Turning this off
-     * gives Foscal's own cobalt, which is also what happens on releases before Android 12, where
-     * the platform has no dynamic scheme to read.
+     * [UiColor.SYSTEM] by default. A calendar's colours belong to its calendars and its events; a
+     * UI that also insists on a hue of its own is competing with the thing it exists to show, so
+     * the safe default is to let the wallpaper decide. The other two answers are Foscal's own blue
+     * and one colour the user picked.
      */
-    val dynamicColor: Flow<Boolean>
+    val uiColor: Flow<UiColor>
+
+    /** The ARGB seed used when [uiColor] is [UiColor.CUSTOM]. */
+    val uiCustomColor: Flow<Int>
     val themeMode: Flow<ThemeMode>
     val use24HourClock: Flow<Boolean>
 
@@ -187,7 +191,9 @@ interface Preferences {
 
     /** Drops [calendarId]'s override so it follows [defaultReminderMinutes] again. */
     suspend fun clearCalendarReminderDefault(calendarId: Long)
-    suspend fun setDynamicColor(enabled: Boolean)
+    suspend fun setUiColor(color: UiColor)
+
+    suspend fun setUiCustomColor(color: Int)
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setUse24HourClock(use24Hour: Boolean)
     suspend fun setOsmMapsEnabled(enabled: Boolean)

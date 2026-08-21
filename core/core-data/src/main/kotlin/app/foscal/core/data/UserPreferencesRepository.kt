@@ -12,6 +12,7 @@ import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.CalendarReminderDefaults
 import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
+import app.foscal.core.model.UiColor
 import java.time.DayOfWeek
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -51,8 +52,11 @@ class UserPreferencesRepository @Inject constructor(
             CalendarReminderDefaults.decode(prefs[CALENDAR_REMINDERS].orEmpty())
         }
 
-    override val dynamicColor: Flow<Boolean> =
-        context.dataStore.data.map { it[DYNAMIC_COLOR] ?: true }
+    override val uiColor: Flow<UiColor> =
+        context.dataStore.data.map { UiColor.fromKey(it[UI_COLOR]) }
+
+    override val uiCustomColor: Flow<Int> =
+        context.dataStore.data.map { it[UI_CUSTOM_COLOR] ?: UiColor.DEFAULT_CUSTOM_COLOR }
 
     override val themeMode: Flow<ThemeMode> =
         context.dataStore.data.map { ThemeMode.fromKey(it[THEME_MODE]) }
@@ -178,8 +182,12 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
-    override suspend fun setDynamicColor(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[DYNAMIC_COLOR] = enabled }
+    override suspend fun setUiColor(color: UiColor) {
+        context.dataStore.edit { prefs -> prefs[UI_COLOR] = color.key }
+    }
+
+    override suspend fun setUiCustomColor(color: Int) {
+        context.dataStore.edit { prefs -> prefs[UI_CUSTOM_COLOR] = color }
     }
 
     override suspend fun setThemeMode(mode: ThemeMode) {
@@ -265,7 +273,8 @@ class UserPreferencesRepository @Inject constructor(
         private val MONTH_MINIMUM_MINUTES = intPreferencesKey("month_minimum_minutes")
         private val DEFAULT_REMINDER = intPreferencesKey("default_reminder_minutes")
         private val CALENDAR_REMINDERS = stringSetPreferencesKey("calendar_reminder_defaults")
-        private val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        private val UI_COLOR = stringPreferencesKey("ui_color")
+        private val UI_CUSTOM_COLOR = intPreferencesKey("ui_custom_color")
         private val THEME_MODE = stringPreferencesKey("theme_mode")
         private val USE_24H_CLOCK = booleanPreferencesKey("use_24h_clock")
         private val OSM_MAPS_ENABLED = booleanPreferencesKey("osm_maps_enabled")

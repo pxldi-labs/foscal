@@ -301,23 +301,14 @@ private fun LazyListScope.appearanceSection(
     state: CalendarsUiState,
     viewModel: CalendarsViewModel,
 ) {
-    // Material You needs a wallpaper-derived palette the platform only exposes from Android 12
-    // on, so on anything older the toggle would be a switch that cannot do anything and is left
-    // out entirely — those phones simply get Foscal's own cobalt.
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        item {
-            ToggleRow(
-                title = "System colours",
-                subtitle = if (state.dynamicColor) {
-                    "Taken from your wallpaper"
-                } else {
-                    "Foscal's own blue"
-                },
-                checked = state.dynamicColor,
-                onToggle = { viewModel.setDynamicColor(it) },
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-        }
+    item {
+        UiColorPicker(
+            selected = state.uiColor,
+            customColor = state.uiCustomColor,
+            onSelect = { viewModel.setUiColor(it) },
+            onPickCustom = { viewModel.setUiCustomColor(it) },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
     }
     item {
         ThemeModePicker(

@@ -183,13 +183,15 @@ project *Android Calendar App Design* (`Calendar.dc.html`). Keep new UI on-syste
   profiles (`app/src/release/generated/baselineProfiles/*.txt`) name the generated methods by
   signature — a rule that no longer resolves is silently dropped, so a rename quietly costs the
   startup coverage it was there to buy.
-- **Colour** — there is no accent picker, and adding one back would be a regression.
-  `Preferences.dynamicColor` is **on by default**: the chrome is Material You, taken
-  from the wallpaper, so the only colours Foscal asserts are its calendars' and events'.
-  Switched off — or on anything below API 31, where the platform has no dynamic scheme —
-  it falls back to `CobaltAccent` in `theme/Color.kt`, which is the one remaining
-  `AccentTokens` set. Never hardcode the accent: read `colorScheme.primary`, which is
-  the whole reason the app re-tints correctly under either scheme.
+- **Colour** — one setting, `Preferences.uiColor` (`UiColor.SYSTEM` / `FOSCAL` / `CUSTOM`),
+  defaulting to SYSTEM. There is deliberately **no palette of preset hues**: the colours that
+  carry meaning belong to the calendars and their events, and the old Cobalt/Violet/Forest
+  picker competed with them. SYSTEM is Material You; FOSCAL is `CobaltAccent` in
+  `theme/Color.kt`, the one remaining `AccentTokens` set; CUSTOM expands a single seed
+  (`Preferences.uiCustomColor`) through `customAccentTokens(seed)`. Cobalt is also the floor
+  below API 31, where the platform has no dynamic scheme to read, so a stored SYSTEM still
+  draws. Never hardcode the accent: read `colorScheme.primary`, which is the whole reason the
+  app re-tints correctly under all three.
 - **Weekend labels** — use `weekendLabelColor()` from the theme (theme-aware gold),
   never a hardcoded value.
 - **Locale** — in composables read `currentLocale()` (`ui/util/Locales.kt`) or

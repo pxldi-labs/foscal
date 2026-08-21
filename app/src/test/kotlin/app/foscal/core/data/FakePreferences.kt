@@ -3,6 +3,7 @@ package app.foscal.core.data
 import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
+import app.foscal.core.model.UiColor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.DayOfWeek
@@ -29,7 +30,9 @@ class FakePreferences(
     override val defaultReminderMinutes: Flow<Int?> = MutableStateFlow(defaultReminder)
     override val calendarReminderDefaults: MutableStateFlow<Map<Long, Int?>> =
         MutableStateFlow(calendarReminders)
-    override val dynamicColor: MutableStateFlow<Boolean> = MutableStateFlow(true)
+    override val uiColor: MutableStateFlow<UiColor> = MutableStateFlow(UiColor.Default)
+    override val uiCustomColor: MutableStateFlow<Int> =
+        MutableStateFlow(UiColor.DEFAULT_CUSTOM_COLOR)
     override val themeMode: MutableStateFlow<ThemeMode> = MutableStateFlow(theme)
     override val use24HourClock: MutableStateFlow<Boolean> = MutableStateFlow(use24Hour)
     override val osmMapsEnabled: MutableStateFlow<Boolean> = MutableStateFlow(osmMaps)
@@ -94,9 +97,8 @@ class FakePreferences(
         calendarReminderDefaults.value -= calendarId
     }
 
-    override suspend fun setDynamicColor(enabled: Boolean) {
-        dynamicColor.value = enabled
-    }
+    override suspend fun setUiColor(color: UiColor) { uiColor.value = color }
+    override suspend fun setUiCustomColor(color: Int) { uiCustomColor.value = color }
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         themeMode.value = mode

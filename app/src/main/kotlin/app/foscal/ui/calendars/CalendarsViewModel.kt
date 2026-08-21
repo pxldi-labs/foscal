@@ -7,6 +7,7 @@ import app.foscal.core.data.CalendarRepository
 import app.foscal.core.data.UserPreferencesRepository
 import app.foscal.core.model.Calendar
 import app.foscal.core.model.ThemeMode
+import app.foscal.core.model.UiColor
 import app.foscal.ics.IcsTransfer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,7 +25,8 @@ data class CalendarsUiState(
     val items: List<CalendarRow> = emptyList(),
     val loading: Boolean = true,
     val defaultReminderMinutes: Int? = 15,
-    val dynamicColor: Boolean = false,
+    val uiColor: UiColor = UiColor.Default,
+    val uiCustomColor: Int = UiColor.DEFAULT_CUSTOM_COLOR,
     val themeMode: ThemeMode = ThemeMode.Default,
     val use24HourClock: Boolean = true,
     val osmMapsEnabled: Boolean = false,
@@ -103,7 +105,8 @@ private data class PrefsSnapshot(
     val themeMode: ThemeMode,
     val use24Hour: Boolean,
     val osmMaps: Boolean,
-    val dynamicColor: Boolean,
+    val uiColor: UiColor,
+    val uiCustomColor: Int,
     val calendarReminders: Map<Long, Int?>,
     val monthHidden: Set<String>,
 )
@@ -137,20 +140,23 @@ class CalendarsViewModel @Inject constructor(
                 themeMode = themeMode,
                 use24Hour = use24Hour,
                 osmMaps = false,
-                dynamicColor = true,
+                uiColor = UiColor.Default,
+                uiCustomColor = UiColor.DEFAULT_CUSTOM_COLOR,
                 calendarReminders = emptyMap(),
                 monthHidden = emptySet(),
             )
         },
         prefs.osmMapsEnabled,
-        prefs.dynamicColor,
-        // Paired because the outer combine is already at its five-argument overload.
+        // Paired for the same reason the reminders are: the outer combine is at its five-argument
+        // overload, and the two colour preferences are one setting anyway.
+        combine(prefs.uiColor, prefs.uiCustomColor, ::Pair),
         combine(prefs.calendarReminderDefaults, prefs.monthHiddenCalendarIds, ::Pair),
-    ) { snapshot, osmMaps, dynamicColor, remindersAndMonth ->
+    ) { snapshot, osmMaps, colour, remindersAndMonth ->
         val (calendarReminders, monthHidden) = remindersAndMonth
         snapshot.copy(
             osmMaps = osmMaps,
-            dynamicColor = dynamicColor,
+            uiColor = colour.first,
+            uiCustomColor = colour.second,
             calendarReminders = calendarReminders,
             monthHidden = monthHidden,
         )
@@ -183,7 +189,8 @@ class CalendarsViewModel @Inject constructor(
             },
             loading = false,
             defaultReminderMinutes = p.defaultReminder,
-            dynamicColor = p.dynamicColor,
+            uiColor = p.uiColor,
+            uiCustomColor = p.uiCustomColor,
             themeMode = p.themeMode,
             use24HourClock = p.use24Hour,
             osmMapsEnabled = p.osmMaps,
@@ -302,8 +309,16 @@ class CalendarsViewModel @Inject constructor(
 
 
 
-    fun setDynamicColor(enabled: Boolean) {
-        viewModelScope.launch { prefs.setDynamicColor(enabled) }
+    fun setUiColor(color: UiColor) {
+        viewModelScope.launch { prefs.setUiColor(color) }
+    }
+
+    /** Picking a colour is also choosing to use it, so the two writes go together. */
+    fun setUiCustomColor(color: Int) {
+        viewModelScope.launch {
+            prefs.setUiCustomColor(color)
+            prefs.setUiColor(UiColor.CUSTOM)
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
