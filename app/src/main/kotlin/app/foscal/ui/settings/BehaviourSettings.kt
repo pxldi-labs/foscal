@@ -147,7 +147,7 @@ fun WidgetSettings(state: BehaviourState, viewModel: BehaviourViewModel) {
     if (picking) {
         ChoiceDialog(
             title = "Events per day",
-            options = WidgetLimitOptions.map { it.toString() to "$it per day" },
+            options = WidgetLimitOptions.map { it.toString() to widgetLimitLabel(it) },
             selected = state.widgetEventLimit.toString(),
             onSelect = { viewModel.setWidgetEventLimit(it.toInt()); picking = false },
             onDismiss = { picking = false },
@@ -156,7 +156,7 @@ fun WidgetSettings(state: BehaviourState, viewModel: BehaviourViewModel) {
     Column {
         ValueRow(
             title = "Events per day",
-            value = "${state.widgetEventLimit} per day",
+            value = widgetLimitLabel(state.widgetEventLimit),
             onClick = { picking = true },
         )
         ToggleRow(
@@ -173,8 +173,11 @@ fun WidgetSettings(state: BehaviourState, viewModel: BehaviourViewModel) {
     }
 }
 
-/** How many of one day's events a widget can list before it stops being read at a glance. */
-private val WidgetLimitOptions = listOf(3, 5, 8, 12, 20)
+/** How many of one day's events the widget lists. Zero, the default, is all of them. */
+private val WidgetLimitOptions = listOf(0, 3, 5, 8, 12, 20)
+
+private fun widgetLimitLabel(limit: Int): String =
+    if (limit <= 0) "All of them" else "$limit per day"
 
 /** What a new event starts out as, before you have typed anything into it. */
 @Composable

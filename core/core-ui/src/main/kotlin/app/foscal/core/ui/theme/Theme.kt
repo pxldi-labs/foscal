@@ -13,7 +13,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
-import app.foscal.core.model.AccentColor
 
 private fun lightColorsFor(accent: AccentTokens) = lightColorScheme(
     primary = accent.primaryLight,
@@ -74,17 +73,15 @@ val LocalIsDarkTheme = staticCompositionLocalOf { false }
 @Composable
 fun FoscalTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
-    accent: AccentColor = AccentColor.Default,
-    customSeed: Color? = null,
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val tokens = if (accent == AccentColor.CUSTOM && customSeed != null) {
-        customAccentTokens(customSeed)
-    } else {
-        accent.tokens()
-    }
+    // One scheme, not a palette. The colour a calendar has to get right is the *event's* colour,
+    // and a UI that also insists on a hue of its own is competing with the thing it exists to
+    // show. So the chrome takes the system's colours where the platform has them, and Foscal's
+    // own cobalt where it does not.
+    val tokens = CobaltAccent
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -100,38 +97,7 @@ fun FoscalTheme(
     }
 }
 
-/** Maps a persisted [AccentColor] preset to its light/dark color tokens. */
-fun AccentColor.tokens(): AccentTokens = when (this) {
-    AccentColor.COBALT -> CobaltAccent
-    AccentColor.VIOLET -> VioletAccent
-    AccentColor.FOREST -> ForestAccent
-    // CUSTOM has no fixed tokens; callers pass the seed to customAccentTokens. Fall back to the
-    // default preset if a seed isn't supplied.
-    AccentColor.CUSTOM -> CobaltAccent
-}
 
-/**
- * Derives a full accent from a single [seed] color by blending it toward white/black, so any
- * user-picked color yields a coherent light/dark palette without hand-tuning each token.
- */
-fun customAccentTokens(seed: Color): AccentTokens = AccentTokens(
-    primaryLight = seed,
-    primaryContainerLight = lerp(seed, Color.White, 0.86f),
-    onPrimaryContainerLight = lerp(seed, Color.Black, 0.62f),
-    primaryDark = lerp(seed, Color.White, 0.55f),
-    onPrimaryDark = lerp(seed, Color.Black, 0.82f),
-    primaryContainerDark = lerp(seed, Color.Black, 0.58f),
-    onPrimaryContainerDark = lerp(seed, Color.White, 0.80f),
-    // A step off the seed rather than a second hue: the presets pair their primary with a chosen
-    // companion, and there is no way to choose one on the user's behalf from a single colour that
-    // would not be a guess. Lighter and quieter is the safe reading of "secondary".
-    secondaryLight = lerp(seed, Color.Black, 0.24f),
-    secondaryContainerLight = lerp(seed, Color.White, 0.80f),
-    onSecondaryContainerLight = lerp(seed, Color.Black, 0.70f),
-    secondaryDark = lerp(seed, Color.White, 0.42f),
-    secondaryContainerDark = lerp(seed, Color.Black, 0.66f),
-    onSecondaryContainerDark = lerp(seed, Color.White, 0.72f),
-)
 
 /**
  * Amber where it is drawn as text rather than as a fill — weekend labels, today's weekday.

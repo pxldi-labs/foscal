@@ -70,11 +70,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.foscal.R
 import app.foscal.core.data.CalendarPermissionState
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.ThemeMode
 import app.foscal.core.ui.theme.DisplayFamily
 import app.foscal.core.ui.theme.Motion
-import app.foscal.ui.settings.AccentPicker
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -222,10 +220,6 @@ fun OnboardingRoute(
                         completing = state.completing,
                         themeMode = state.themeMode,
                         onThemeSelect = viewModel::setThemeMode,
-                        accentColor = state.accentColor,
-                        accentCustomColor = state.accentCustomColor,
-                        onAccentSelect = viewModel::setAccentColor,
-                        onCustomAccentPick = viewModel::setCustomAccentColor,
                         notificationsEnabled = notificationsEnabled,
                         onNotificationsToggle = { want ->
                             when {
@@ -443,10 +437,6 @@ private fun PersonalizeStep(
     completing: Boolean,
     themeMode: ThemeMode,
     onThemeSelect: (ThemeMode) -> Unit,
-    accentColor: AccentColor,
-    accentCustomColor: Int,
-    onAccentSelect: (AccentColor) -> Unit,
-    onCustomAccentPick: (Int) -> Unit,
     notificationsEnabled: Boolean,
     onNotificationsToggle: (Boolean) -> Unit,
     batteryOptimized: Boolean,
@@ -468,12 +458,6 @@ private fun PersonalizeStep(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ThemeCard(selected = themeMode, onSelect = onThemeSelect)
-        AccentCard(
-            selected = accentColor,
-            customColor = accentCustomColor,
-            onSelectPreset = onAccentSelect,
-            onPickCustom = onCustomAccentPick,
-        )
         ToggleCard(
             icon = Icons.Outlined.Notifications,
             title = "Reminders",
@@ -514,48 +498,6 @@ private fun PersonalizeStep(
     }
 }
 
-@Composable
-private fun AccentCard(
-    selected: AccentColor,
-    customColor: Int,
-    onSelectPreset: (AccentColor) -> Unit,
-    onPickCustom: (Int) -> Unit,
-) {
-    androidx.compose.material3.Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Icon(
-                    Icons.Outlined.Palette,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp),
-                )
-                Text(
-                    "Accent colour",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            AccentPicker(
-                selected = selected,
-                customColor = customColor,
-                onSelectPreset = onSelectPreset,
-                onPickCustom = onPickCustom,
-                label = null,
-            )
-        }
-    }
-}
 
 @Composable
 private fun ThemeCard(

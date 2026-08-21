@@ -8,7 +8,6 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.CalendarReminderDefaults
 import app.foscal.core.model.EventColorStrength
@@ -52,14 +51,8 @@ class UserPreferencesRepository @Inject constructor(
             CalendarReminderDefaults.decode(prefs[CALENDAR_REMINDERS].orEmpty())
         }
 
-    override val accentColor: Flow<AccentColor> =
-        context.dataStore.data.map { AccentColor.fromKey(it[ACCENT_COLOR]) }
-
-    override val accentCustomColor: Flow<Int> =
-        context.dataStore.data.map { it[ACCENT_CUSTOM_COLOR] ?: AccentColor.DEFAULT_CUSTOM_COLOR }
-
     override val dynamicColor: Flow<Boolean> =
-        context.dataStore.data.map { it[DYNAMIC_COLOR] ?: false }
+        context.dataStore.data.map { it[DYNAMIC_COLOR] ?: true }
 
     override val themeMode: Flow<ThemeMode> =
         context.dataStore.data.map { ThemeMode.fromKey(it[THEME_MODE]) }
@@ -103,11 +96,11 @@ class UserPreferencesRepository @Inject constructor(
         }
 
     override val showDeclinedEvents: Flow<Boolean> =
-        context.dataStore.data.map { it[SHOW_DECLINED] ?: false }
+        context.dataStore.data.map { it[SHOW_DECLINED] ?: true }
 
     override val widgetEventLimit: Flow<Int> =
         context.dataStore.data.map {
-            it[WIDGET_EVENT_LIMIT]?.coerceIn(1, 20) ?: Preferences.DEFAULT_WIDGET_EVENT_LIMIT
+            it[WIDGET_EVENT_LIMIT]?.coerceIn(0, 20) ?: Preferences.DEFAULT_WIDGET_EVENT_LIMIT
         }
 
     override val widgetDetailedRows: Flow<Boolean> =
@@ -185,14 +178,6 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
-    override suspend fun setAccentColor(accent: AccentColor) {
-        context.dataStore.edit { prefs -> prefs[ACCENT_COLOR] = accent.key }
-    }
-
-    override suspend fun setAccentCustomColor(color: Int) {
-        context.dataStore.edit { prefs -> prefs[ACCENT_CUSTOM_COLOR] = color }
-    }
-
     override suspend fun setDynamicColor(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[DYNAMIC_COLOR] = enabled }
     }
@@ -230,7 +215,7 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     override suspend fun setWidgetEventLimit(limit: Int) {
-        context.dataStore.edit { prefs -> prefs[WIDGET_EVENT_LIMIT] = limit.coerceIn(1, 20) }
+        context.dataStore.edit { prefs -> prefs[WIDGET_EVENT_LIMIT] = limit.coerceIn(0, 20) }
     }
 
     override suspend fun setWidgetDetailedRows(enabled: Boolean) {
@@ -280,8 +265,6 @@ class UserPreferencesRepository @Inject constructor(
         private val MONTH_MINIMUM_MINUTES = intPreferencesKey("month_minimum_minutes")
         private val DEFAULT_REMINDER = intPreferencesKey("default_reminder_minutes")
         private val CALENDAR_REMINDERS = stringSetPreferencesKey("calendar_reminder_defaults")
-        private val ACCENT_COLOR = stringPreferencesKey("accent_color")
-        private val ACCENT_CUSTOM_COLOR = intPreferencesKey("accent_custom_color")
         private val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         private val THEME_MODE = stringPreferencesKey("theme_mode")
         private val USE_24H_CLOCK = booleanPreferencesKey("use_24h_clock")

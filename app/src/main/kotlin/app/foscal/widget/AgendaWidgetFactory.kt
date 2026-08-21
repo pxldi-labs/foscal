@@ -67,7 +67,7 @@ class AgendaWidgetFactory(private val context: Context) : RemoteViewsService.Rem
             // when the question was "what is coming up".
             .groupBy { it.startLocalDate(zone).coerceAtLeast(today) }
             .toSortedMap()
-            .flatMap { (_, ofDay) -> ofDay.take(perDay) }
+            .flatMap { (_, ofDay) -> if (perDay <= 0) ofDay else ofDay.take(perDay) }
 
         var lastDay: LocalDate? = null
         return events.take(MAX_ROWS).map { e ->

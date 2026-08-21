@@ -1,6 +1,5 @@
 package app.foscal.core.data
 
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.DayTapAction
 import app.foscal.core.model.EventColorStrength
 import app.foscal.core.model.ThemeMode
@@ -51,14 +50,13 @@ interface Preferences {
      * combine this with [defaultReminderMinutes].
      */
     val calendarReminderDefaults: Flow<Map<Long, Int?>>
-    val accentColor: Flow<AccentColor>
-    /** ARGB seed color used when [accentColor] is [AccentColor.CUSTOM]. */
-    val accentCustomColor: Flow<Int>
     /**
-     * Whether to derive the color scheme from the system wallpaper (Material You) instead of
-     * [accentColor]. Off by default: Foscal's own accent is part of its visual identity, and the
-     * platform only supplies a dynamic scheme from Android 12 on, so on older releases this has
-     * nothing to read and is never offered.
+     * Whether the app's own chrome takes its colours from the system wallpaper (Material You).
+     *
+     * On by default. A calendar's colours belong to its calendars and its events; a UI that also
+     * insists on a hue of its own is competing with the thing it exists to show. Turning this off
+     * gives Foscal's own cobalt, which is also what happens on releases before Android 12, where
+     * the platform has no dynamic scheme to read.
      */
     val dynamicColor: Flow<Boolean>
     val themeMode: Flow<ThemeMode>
@@ -106,13 +104,13 @@ interface Preferences {
     /**
      * Whether an event the user has declined still appears on the grid.
      *
-     * Off by default: a meeting you said no to is one you are not going to, and leaving it in
-     * place makes a free afternoon look busy. It is still reachable through search, and the event
-     * itself is untouched — this hides it, it does not delete it.
+     * On by default: a declined meeting is still something that happens, and a calendar that
+     * silently drops events is a calendar you cannot trust. Turning it off is for people who have
+     * decided that "no" means gone.
      */
     val showDeclinedEvents: Flow<Boolean>
 
-    /** How many events the agenda widget lists per day before it stops. */
+    /** How many of a day's events the agenda widget lists; 0 is all of them. */
     val widgetEventLimit: Flow<Int>
 
     /**
@@ -189,8 +187,6 @@ interface Preferences {
 
     /** Drops [calendarId]'s override so it follows [defaultReminderMinutes] again. */
     suspend fun clearCalendarReminderDefault(calendarId: Long)
-    suspend fun setAccentColor(accent: AccentColor)
-    suspend fun setAccentCustomColor(color: Int)
     suspend fun setDynamicColor(enabled: Boolean)
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setUse24HourClock(use24Hour: Boolean)
@@ -215,8 +211,11 @@ interface Preferences {
          */
         const val DEFAULT_ALL_DAY_REMINDER_MINUTES = 900
 
-        /** How many of a day's events the widget lists before it stops being glanceable. */
-        const val DEFAULT_WIDGET_EVENT_LIMIT = 5
+        /**
+         * All of them. A cap is a choice about a home screen the app cannot see the size of, and
+         * a widget that hides Thursday's third event is worse than one that scrolls.
+         */
+        const val DEFAULT_WIDGET_EVENT_LIMIT = 0
 
         /** An hour, the length most calendar apps assume and most meetings actually are. */
         const val DEFAULT_EVENT_MINUTES = 60

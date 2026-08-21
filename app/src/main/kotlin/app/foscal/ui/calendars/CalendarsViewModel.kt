@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.foscal.core.data.CalendarRepository
 import app.foscal.core.data.UserPreferencesRepository
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.Calendar
 import app.foscal.core.model.ThemeMode
 import app.foscal.ics.IcsTransfer
@@ -25,8 +24,6 @@ data class CalendarsUiState(
     val items: List<CalendarRow> = emptyList(),
     val loading: Boolean = true,
     val defaultReminderMinutes: Int? = 15,
-    val accentColor: AccentColor = AccentColor.Default,
-    val accentCustomColor: Int = AccentColor.DEFAULT_CUSTOM_COLOR,
     val dynamicColor: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.Default,
     val use24HourClock: Boolean = true,
@@ -103,11 +100,9 @@ data class CalendarRow(
 private data class PrefsSnapshot(
     val hidden: Set<String>,
     val defaultReminder: Int?,
-    val accent: AccentColor,
     val themeMode: ThemeMode,
     val use24Hour: Boolean,
     val osmMaps: Boolean,
-    val accentCustom: Int,
     val dynamicColor: Boolean,
     val calendarReminders: Map<Long, Int?>,
     val monthHidden: Set<String>,
@@ -133,33 +128,28 @@ class CalendarsViewModel @Inject constructor(
         combine(
             prefs.hiddenCalendarIds,
             prefs.defaultReminderMinutes,
-            prefs.accentColor,
             prefs.themeMode,
             prefs.use24HourClock,
-        ) { hidden, defaultReminder, accent, themeMode, use24Hour ->
+        ) { hidden, defaultReminder, themeMode, use24Hour ->
             PrefsSnapshot(
                 hidden = hidden,
                 defaultReminder = defaultReminder,
-                accent = accent,
                 themeMode = themeMode,
                 use24Hour = use24Hour,
                 osmMaps = false,
-                accentCustom = 0,
-                dynamicColor = false,
+                dynamicColor = true,
                 calendarReminders = emptyMap(),
                 monthHidden = emptySet(),
             )
         },
         prefs.osmMapsEnabled,
-        prefs.accentCustomColor,
         prefs.dynamicColor,
         // Paired because the outer combine is already at its five-argument overload.
         combine(prefs.calendarReminderDefaults, prefs.monthHiddenCalendarIds, ::Pair),
-    ) { snapshot, osmMaps, accentCustom, dynamicColor, remindersAndMonth ->
+    ) { snapshot, osmMaps, dynamicColor, remindersAndMonth ->
         val (calendarReminders, monthHidden) = remindersAndMonth
         snapshot.copy(
             osmMaps = osmMaps,
-            accentCustom = accentCustom,
             dynamicColor = dynamicColor,
             calendarReminders = calendarReminders,
             monthHidden = monthHidden,
@@ -193,8 +183,6 @@ class CalendarsViewModel @Inject constructor(
             },
             loading = false,
             defaultReminderMinutes = p.defaultReminder,
-            accentColor = p.accent,
-            accentCustomColor = p.accentCustom,
             dynamicColor = p.dynamicColor,
             themeMode = p.themeMode,
             use24HourClock = p.use24Hour,
@@ -312,17 +300,7 @@ class CalendarsViewModel @Inject constructor(
         viewModelScope.launch { prefs.clearCalendarReminderDefault(calendarId) }
     }
 
-    fun setAccentColor(accent: AccentColor) {
-        viewModelScope.launch { prefs.setAccentColor(accent) }
-    }
 
-    /** Persists [color] as the custom accent seed and switches the accent to CUSTOM. */
-    fun setCustomAccentColor(color: Int) {
-        viewModelScope.launch {
-            prefs.setAccentCustomColor(color)
-            prefs.setAccentColor(AccentColor.CUSTOM)
-        }
-    }
 
     fun setDynamicColor(enabled: Boolean) {
         viewModelScope.launch { prefs.setDynamicColor(enabled) }

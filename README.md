@@ -15,8 +15,8 @@ CalDAV-compatible server (Nextcloud, ownCloud, Radicale, Baïkal, …) via
 
 ## Design goals
 
-- **Beautiful and modern.** Jetpack Compose + Material 3 with a custom, user-selectable
-  accent palette.
+- **Beautiful and modern.** Jetpack Compose + Material 3, taking its colours from
+  your wallpaper so the only colours Foscal insists on are your calendars' own.
 - **Works offline.** Create and use local calendars without any account or
   network.
 - **Open sync.** Uses the Android system Calendar Provider, so any installed
@@ -40,14 +40,13 @@ CalDAV-compatible server (Nextcloud, ownCloud, Radicale, Baïkal, …) via
 - **Custom design system** — the app's own visual voice: the *Gabarito*
   display face on dates and titles, *Manrope* for UI (both SIL Open Font
   License 1.1, with the licence text in `core/core-ui/src/main/assets/licenses`), a
-  Cobalt accent, soft color-stripe event cards, a unified app/onboarding icon,
-  and 24-hour time by default. Full light & dark support.
+  soft color-stripe event cards, a unified app/onboarding icon, and 24-hour time
+  by default. Full light & dark support.
 - **Settings** is a fourth bottom-nav tab (it slides in alongside Month / Week /
   Agenda) with appearance, date & time, calendar visibility, and reminder options.
-- **Configurable accent** — pick **Cobalt / Violet / Forest** or a custom color
-  in Settings; the whole UI re-tints instantly and the choice is persisted. On
-  Android 12+ you can instead switch on **wallpaper colors** (Material You) and
-  let the system palette drive the app.
+- **System colours by default** — on Android 12+ the app's chrome is drawn from
+  your wallpaper (Material You). Turn it off in Settings for Foscal's own cobalt,
+  which is also what older releases get, since they have no dynamic palette to read.
 - **Theme & clock** — force **System / Light / Dark** and toggle **12- / 24-hour
   time**; both apply live across every screen and persist.
 - **Event editor** — create, edit, and delete events with title, calendar,
@@ -99,11 +98,11 @@ CalDAV-compatible server (Nextcloud, ownCloud, Radicale, Baïkal, …) via
 - **Offline local calendars** and hand-off to DAVx⁵ for CalDAV sync.
 - **Permission-first onboarding** — calendar access is requested up front and
   the UI reacts the instant it is granted; no provider access happens before.
-  The final step lets users choose theme, accent color, reminders, and opt-in
-  map picking before entering the main calendar.
-- Material 3, edge-to-edge, light & dark themes. The color scheme defaults to
-  Foscal's own accent system (Cobalt / Violet / Forest / custom); wallpaper-derived
-  dynamic color is available as an opt-in toggle on Android 12+.
+  The final step lets users choose theme, reminders, and opt-in map picking
+  before entering the main calendar.
+- Material 3, edge-to-edge, light & dark themes. The color scheme is wallpaper-derived
+  (Material You) by default on Android 12+, and falls back to Foscal's own cobalt when
+  that is switched off or unavailable.
 
 ## Roadmap
 

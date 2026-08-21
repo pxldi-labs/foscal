@@ -12,7 +12,6 @@ import androidx.lifecycle.viewModelScope
 import app.foscal.core.data.CalendarPermissionState
 import app.foscal.core.data.CalendarRepository
 import app.foscal.core.data.UserPreferencesRepository
-import app.foscal.core.model.AccentColor
 import app.foscal.core.model.ThemeMode
 import app.foscal.ui.CalendarColors
 import app.foscal.notifications.ReminderFix
@@ -46,8 +45,6 @@ data class OnboardingUiState(
     val batteryOptimized: Boolean = false,
     val mapsEnabled: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val accentColor: AccentColor = AccentColor.Default,
-    val accentCustomColor: Int = AccentColor.DEFAULT_CUSTOM_COLOR,
     val error: String? = null,
 )
 
@@ -66,14 +63,6 @@ class OnboardingViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             prefs.themeMode.collect { mode -> _internal.update { it.copy(themeMode = mode) } }
-        }
-        viewModelScope.launch {
-            prefs.accentColor.collect { accent -> _internal.update { it.copy(accentColor = accent) } }
-        }
-        viewModelScope.launch {
-            prefs.accentCustomColor.collect { color ->
-                _internal.update { it.copy(accentCustomColor = color) }
-            }
         }
     }
 
@@ -133,18 +122,6 @@ class OnboardingViewModel @Inject constructor(
         viewModelScope.launch { prefs.setThemeMode(mode) }
     }
 
-    fun setAccentColor(accent: AccentColor) {
-        _internal.update { it.copy(accentColor = accent) }
-        viewModelScope.launch { prefs.setAccentColor(accent) }
-    }
-
-    fun setCustomAccentColor(color: Int) {
-        _internal.update { it.copy(accentColor = AccentColor.CUSTOM, accentCustomColor = color) }
-        viewModelScope.launch {
-            prefs.setAccentCustomColor(color)
-            prefs.setAccentColor(AccentColor.CUSTOM)
-        }
-    }
 
     private fun davxStatus(): DAVxStatus {
         val pm = context.packageManager

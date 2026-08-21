@@ -303,28 +303,19 @@ private fun LazyListScope.appearanceSection(
 ) {
     // Material You needs a wallpaper-derived palette the platform only exposes from Android 12
     // on, so on anything older the toggle would be a switch that cannot do anything and is left
-    // out entirely.
+    // out entirely — those phones simply get Foscal's own cobalt.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         item {
             ToggleRow(
-                title = "Use wallpaper colours",
-                subtitle = if (state.dynamicColor) "On" else "Off",
+                title = "System colours",
+                subtitle = if (state.dynamicColor) {
+                    "Taken from your wallpaper"
+                } else {
+                    "Foscal's own blue"
+                },
                 checked = state.dynamicColor,
                 onToggle = { viewModel.setDynamicColor(it) },
                 modifier = Modifier.padding(horizontal = 12.dp),
-            )
-        }
-    }
-    // The accent is what wallpaper colours replace, so showing the picker alongside them would
-    // offer a choice that changes nothing on screen.
-    if (!state.dynamicColor) {
-        item {
-            AccentPicker(
-                selected = state.accentColor,
-                customColor = state.accentCustomColor,
-                onSelectPreset = { viewModel.setAccentColor(it) },
-                onPickCustom = { viewModel.setCustomAccentColor(it) },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
     }

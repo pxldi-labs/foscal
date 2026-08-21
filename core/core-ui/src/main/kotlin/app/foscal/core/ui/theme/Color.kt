@@ -55,37 +55,7 @@ val CobaltAccent = AccentTokens(
     onSecondaryContainerDark = Color(0xFFDDE0FD),
 )
 
-val VioletAccent = AccentTokens(
-    primaryLight = Color(0xFF6E45E2),
-    primaryContainerLight = Color(0xFFEDE7FF),
-    onPrimaryContainerLight = Color(0xFF2C1470),
-    primaryDark = Color(0xFFC3B0FF),
-    onPrimaryDark = Color(0xFF17093B),
-    primaryContainerDark = Color(0xFF39236E),
-    onPrimaryContainerDark = Color(0xFFE7DEFF),
-    secondaryLight = Color(0xFF796D9E),
-    secondaryContainerLight = Color(0xFFEFEAFF),
-    onSecondaryContainerLight = Color(0xFF373147),
-    secondaryDark = Color(0xFFC3B0FF),
-    secondaryContainerDark = Color(0xFF423C57),
-    onSecondaryContainerDark = Color(0xFFEEE9FF),
-)
 
-val ForestAccent = AccentTokens(
-    primaryLight = Color(0xFF1E8E5A),
-    primaryContainerLight = Color(0xFFD8F2E2),
-    onPrimaryContainerLight = Color(0xFF06331E),
-    primaryDark = Color(0xFF77D6A2),
-    onPrimaryDark = Color(0xFF032013),
-    primaryContainerDark = Color(0xFF145033),
-    onPrimaryContainerDark = Color(0xFFC9F3D8),
-    secondaryLight = Color(0xFF4C7D65),
-    secondaryContainerLight = Color(0xFFDEF3E8),
-    onSecondaryContainerLight = Color(0xFF243B2F),
-    secondaryDark = Color(0xFF7FD1A8),
-    secondaryContainerDark = Color(0xFF2B4739),
-    onSecondaryContainerDark = Color(0xFFDBF2E7),
-)
 
 /**
  * Amber — the day the launcher icon marks, and the day the app marks.

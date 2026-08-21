@@ -29,7 +29,7 @@ data class BehaviourState(
     /** Minutes before local midnight that a new all-day event reminds; null is none. */
     val allDayReminderMinutes: Int? = Preferences.DEFAULT_ALL_DAY_REMINDER_MINUTES,
     /** Whether events the user has declined still take up space on the grid. */
-    val showDeclinedEvents: Boolean = false,
+    val showDeclinedEvents: Boolean = true,
     val widgetEventLimit: Int = Preferences.DEFAULT_WIDGET_EVENT_LIMIT,
     val widgetDetailedRows: Boolean = true,
     val suggestEventTitles: Boolean = true,
